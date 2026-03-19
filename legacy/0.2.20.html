@@ -2642,59 +2642,6 @@
         return bestTarget;
       }
 
-      updateRescueAutopilot(dt) {
-        const player = this.aiPlayer;
-        if (!player || !player.isAlive) {
-          return;
-        }
-
-        const dx = player.x - this.x;
-        const dy = player.y - this.y;
-        const dist = Math.max(0.001, Math.hypot(dx, dy));
-        const nx = dx / dist;
-        const ny = dy / dist;
-        const desiredStandoff = Math.max(
-          this.radius + player.radius + 18,
-          Math.min(this.rescueApproachRadius, Math.max(82, this.interactionRadius * 0.62))
-        );
-        const approachSpeed = clamp(
-          (dist - desiredStandoff) * 0.7,
-          -22,
-          Math.max(132, this.maxCruiseSpeed * 2.8)
-        );
-        let desiredVX = player.vx + nx * approachSpeed;
-        let desiredVY = player.vy + ny * approachSpeed;
-
-        if (dist < desiredStandoff + 8) {
-          desiredVX = lerp(desiredVX, player.vx, 0.96);
-          desiredVY = lerp(desiredVY, player.vy, 0.96);
-        }
-
-        const avoidance = this.computeAvoidance();
-        let maxAccel = Math.max(this.maxPlanetMatchAcceleration * 1.3, this.maxThrustAcceleration * 1.55);
-        if (avoidance.hardPlanetThreat) {
-          maxAccel = Math.max(maxAccel, this.maxPlanetMatchAcceleration * 1.45);
-        }
-
-        const rawSteerX = (desiredVX - this.vx) * 2.35 + avoidance.x;
-        const rawSteerY = (desiredVY - this.vy) * 2.35 + avoidance.y;
-        maxAccel = Math.max(maxAccel, Math.min(this.maxPlanetMatchAcceleration * 1.5, this.maxThrustAcceleration + avoidance.extraAccel * 0.6));
-
-        const steer = clampVectorMagnitude(rawSteerX, rawSteerY, maxAccel);
-        this.applyAcceleration(steer.x, steer.y, dt);
-        this.isOrbitingPlanet = false;
-
-        this.combatTarget = null;
-        this.combatDistance = Infinity;
-        this.targetPreference = "rescue";
-
-        const faceX = Math.abs(rawSteerX) + Math.abs(rawSteerY) > 0.6 ? rawSteerX : dx;
-        const faceY = Math.abs(rawSteerX) + Math.abs(rawSteerY) > 0.6 ? rawSteerY : dy;
-        const targetAngle = Math.atan2(faceY, faceX);
-        this.angle += wrapAngle(targetAngle - this.angle) * clamp(dt * 6.2, 0, 1);
-        this.angularVelocity = 0;
-      }
-
       registerLongRangeHit(projectile) {
         const impactSpeed = Math.hypot(projectile.vx, projectile.vy);
         if (!(impactSpeed > 0.001)) return;
@@ -2793,13 +2740,29 @@
           !nearbyEnemyCombat
         );
 
-        if (shouldRescuePlayer) {
-          this.updateRescueAutopilot(dt);
-          return;
-        }
-
         let enemyTarget = null;
-        if (this.aiPlayer && this.aiPlayer.isAlive && dispositionToPlayer === "enemy") {
+        if (shouldRescuePlayer) {
+          const dx = this.aiPlayer.x - this.x;
+          const dy = this.aiPlayer.y - this.y;
+          const dist = Math.max(0.001, Math.hypot(dx, dy));
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const desiredStandoff = Math.max(
+            this.radius + this.aiPlayer.radius + 18,
+            Math.min(this.rescueApproachRadius, this.interactionRadius * 0.42)
+          );
+          const approach = clamp((dist - desiredStandoff) * 0.4, -28, 96);
+          desiredVX = this.aiPlayer.vx + nx * approach;
+          desiredVY = this.aiPlayer.vy + ny * approach;
+
+          if (dist < desiredStandoff + 14) {
+            desiredVX = lerp(desiredVX, this.aiPlayer.vx, 0.7);
+            desiredVY = lerp(desiredVY, this.aiPlayer.vy, 0.7);
+          }
+
+          orbiting = false;
+          maxAccel = Math.max(maxAccel, this.maxPlanetMatchAcceleration * 1.08);
+        } else if (this.aiPlayer && this.aiPlayer.isAlive && dispositionToPlayer === "enemy") {
           const dx = this.aiPlayer.x - this.x;
           const dy = this.aiPlayer.y - this.y;
           const dist = Math.hypot(dx, dy);
