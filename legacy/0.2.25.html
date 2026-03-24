@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asteroids 0.2.26</title>
+  <title>Asteroids 0.2.25</title>
   <style>
     html, body {
       margin: 0;
@@ -7582,10 +7582,7 @@
 
       if (markerType === "planet") {
         ctx.beginPath();
-        ctx.arc(0, 0, 4.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.7)";
-        ctx.lineWidth = 1;
+        ctx.arc(0, 0, 4.2, 0, Math.PI * 2);
         ctx.stroke();
       } else if (markerType === "ship") {
         ctx.beginPath();
@@ -7655,17 +7652,9 @@
         const dx = body.x - playerShip.x;
         const dy = body.y - playerShip.y;
         const distSq = dx * dx + dy * dy;
-        const dist = Math.sqrt(distSq);
-        if (markerType === "planet") {
-          if (dist - (body.colliderRadius ?? body.radius ?? 0) > radarRange) return;
-        } else if (distSq > radarRange * radarRange) {
-          return;
-        }
-        const displayDist = markerType === "planet"
-          ? Math.max(0, dist - Math.min(body.colliderRadius ?? body.radius ?? 0, radarRange * 0.92))
-          : dist;
-        const px = dist > 1e-6 ? dx / dist * displayDist * scale : 0;
-        const py = dist > 1e-6 ? dy / dist * displayDist * scale : 0;
+        if (distSq > radarRange * radarRange) return;
+        const px = dx * scale;
+        const py = dy * scale;
         let color = "#d9d9d9";
         if (markerType === "planet") {
           color = body.color ?? "#9fd7ff";
