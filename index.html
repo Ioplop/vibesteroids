@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asteroids 0.3.3</title>
+  <title>Asteroids 0.3.4</title>
   <style>
     html, body {
       margin: 0;
@@ -4821,6 +4821,7 @@
         this.gravitySourceBodies = [];
         this.hasRemovedBodies = false;
         this.gridIsFresh = false;
+        this.gravityGridIsFresh = false;
         this.onBodyAdded = null;
         this.onBodyRemoved = null;
         this.asteroidFragmentRadiusFactor = 0.68;
@@ -4927,6 +4928,7 @@
         }
 
         this.gridIsFresh = false;
+        this.gravityGridIsFresh = false;
 
         if (this.onBodyAdded) {
           this.onBodyAdded(body);
@@ -4946,6 +4948,7 @@
         body.isRemoved = true;
         this.hasRemovedBodies = true;
         this.gridIsFresh = false;
+        this.gravityGridIsFresh = false;
 
         if (this.onBodyRemoved) {
           this.onBodyRemoved(body);
@@ -4988,28 +4991,44 @@
         this.hasRemovedBodies = false;
       }
 
-      // Indica si la grid actual necesita reconstruirse antes de otra consulta.
+      // Indica si la grid de colisiones actual necesita reconstruirse antes de otra consulta.
       ensureFreshGrid() {
         if (!this.gridIsFresh) {
           this.rebuildGrid();
         }
       }
 
-      // Gestiona rebuild grid dentro del flujo principal del juego.
+      // Indica si la grid usada por la gravedad necesita reconstruirse antes de aplicarla.
+      ensureFreshGravityGrid() {
+        if (!this.gravityGridIsFresh) {
+          this.rebuildGravityGrid();
+        }
+      }
+
+      // Reconstruye la grid principal de colisiones a partir del estado actual de los cuerpos.
       rebuildGrid() {
         this.grid.clear();
-        this.gravityGrid.clear();
 
         for (let i = 0; i < this.bodies.length; i++) {
           const body = this.bodies[i];
           if (body.isRemoved) continue;
           this.grid.insert(body);
-          if (body.receivesGravity) {
-            this.gravityGrid.insertByCenter(body);
-          }
         }
 
         this.gridIsFresh = true;
+      }
+
+      // Reconstruye la grid auxiliar centrada usada para consultas de gravedad.
+      rebuildGravityGrid() {
+        this.gravityGrid.clear();
+
+        for (let i = 0; i < this.bodies.length; i++) {
+          const body = this.bodies[i];
+          if (body.isRemoved || !body.receivesGravity) continue;
+          this.gravityGrid.insertByCenter(body);
+        }
+
+        this.gravityGridIsFresh = true;
       }
 
       // Gestiona cull transient bodies dentro del flujo principal del juego.
@@ -6437,6 +6456,7 @@
       step(dt) {
         this.cleanupRemovedBodies();
         this.ensureFreshGrid();
+        this.ensureFreshGravityGrid();
         this.aiTickId += 1;
         this.updateMerchantRescueState(playerShip);
         this.applyGravity(dt);
@@ -6448,6 +6468,7 @@
         }
 
         this.gridIsFresh = false;
+        this.gravityGridIsFresh = false;
         this.cullTransientBodies();
         this.cleanupRemovedBodies();
         this.rebuildGrid();
@@ -6460,9 +6481,7 @@
           collisions = this.resolveCollisions();
         }
 
-        this.gridIsFresh = false;
         this.cleanupRemovedBodies();
-        this.rebuildGrid();
         this.updateAsteroidPlanetAbsorption(dt);
         this.gridIsFresh = false;
         this.cleanupRemovedBodies();
