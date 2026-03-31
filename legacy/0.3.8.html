@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asteroids 0.4.0</title>
+  <title>Asteroids 0.3.8</title>
   <style>
     html, body {
       margin: 0;
@@ -8376,27 +8376,13 @@
       viewport: null
     };
 
-    const diagnosticsMenuState = {
-      isOpen: false,
-      scrollOffset: 0,
-      maxScroll: 0,
-      viewport: null
-    };
-
     const pauseState = {
       manual: false
     };
 
-    const performanceMonitor = {
-      fps: 60,
-      frameDtMs: 1000 / 60,
-      smoothedFrameDt: 1 / 60,
-      smoothing: 0.12
-    };
-
     // Indica si simulation paused cumple la condicion esperada para esta logica.
     function isSimulationPaused() {
-      return pauseState.manual || shopState.isOpen || factionMenuState.isOpen || diagnosticsMenuState.isOpen;
+      return pauseState.manual || shopState.isOpen || factionMenuState.isOpen;
     }
 
     // Gestiona reset menu scroll dentro del flujo principal del juego.
@@ -8416,15 +8402,6 @@
       if (!menuState) return;
       menuState.scrollOffset = (menuState.scrollOffset || 0) + delta;
       clampMenuScroll(menuState);
-    }
-
-
-    // Devuelve el menu desplazable activo calculado a partir del estado actual.
-    function getActiveScrollableMenu() {
-      if (shopState.isOpen) return shopState;
-      if (factionMenuState.isOpen) return factionMenuState;
-      if (diagnosticsMenuState.isOpen) return diagnosticsMenuState;
-      return null;
     }
 
     function drawVerticalScrollbar(x, y, viewportHeight, contentHeight, scrollOffset, accentColor = "rgba(255,255,255,0.85)") {
@@ -8966,30 +8943,14 @@
         if (testCheats.testMode) {
           return;
         }
-        if (!shopState.isOpen && !factionMenuState.isOpen && !diagnosticsMenuState.isOpen && !world.isGameOver) {
+        if (!shopState.isOpen && !factionMenuState.isOpen && !world.isGameOver) {
           pauseState.manual = !pauseState.manual;
         }
         e.preventDefault();
         return;
       }
 
-      if (e.code === "Tab") {
-        if (shopState.isOpen || factionMenuState.isOpen) {
-          e.preventDefault();
-          return;
-        }
-        diagnosticsMenuState.isOpen = !diagnosticsMenuState.isOpen;
-        pauseState.manual = false;
-        resetMenuScroll(diagnosticsMenuState);
-        e.preventDefault();
-        return;
-      }
-
       if (e.code === "KeyQ") {
-        if (shopState.isOpen || diagnosticsMenuState.isOpen) {
-          e.preventDefault();
-          return;
-        }
         factionMenuState.isOpen = !factionMenuState.isOpen;
         if (factionMenuState.isOpen) {
           pauseState.manual = false;
@@ -9000,10 +8961,6 @@
       }
 
       if (e.code === "KeyE") {
-        if (diagnosticsMenuState.isOpen) {
-          e.preventDefault();
-          return;
-        }
         if (shopState.isOpen) {
           closeShop();
         } else if (!factionMenuState.isOpen) {
@@ -9017,13 +8974,6 @@
         return;
       }
 
-      if (diagnosticsMenuState.isOpen && (e.key === "Escape" || e.code === "Tab")) {
-        diagnosticsMenuState.isOpen = false;
-        resetMenuScroll(diagnosticsMenuState);
-        e.preventDefault();
-        return;
-      }
-
       if (factionMenuState.isOpen && (e.key === "Escape" || e.code === "KeyQ")) {
         factionMenuState.isOpen = false;
         resetMenuScroll(factionMenuState);
@@ -9031,7 +8981,7 @@
         return;
       }
 
-      const activeScrollableMenu = getActiveScrollableMenu();
+      const activeScrollableMenu = shopState.isOpen ? shopState : (factionMenuState.isOpen ? factionMenuState : null);
       if (activeScrollableMenu) {
         const lineStep = 52;
         const pageStep = Math.max(120, (activeScrollableMenu.viewport?.h || 0) - 48);
@@ -9099,7 +9049,7 @@
       updateMouseWorld();
 
       if (!shopState.isOpen) {
-        canvas.style.cursor = (factionMenuState.isOpen || diagnosticsMenuState.isOpen) ? "default" : "crosshair";
+        canvas.style.cursor = factionMenuState.isOpen ? "default" : "crosshair";
         return;
       }
 
@@ -9135,7 +9085,7 @@
     });
 
     canvas.addEventListener("wheel", (event) => {
-      const activeScrollableMenu = getActiveScrollableMenu();
+      const activeScrollableMenu = shopState.isOpen ? shopState : (factionMenuState.isOpen ? factionMenuState : null);
       if (!activeScrollableMenu) return;
       scrollMenu(activeScrollableMenu, event.deltaY);
       event.preventDefault();
@@ -9870,9 +9820,16 @@
 
     // Dibuja hud en el contexto de render correspondiente.
     function drawHUD() {
+      const speed = Math.hypot(playerShip.vx, playerShip.vy);
       const nearbyStation = findNearbyStation();
-      const contextualBaseY = testCheats.testMode ? 190 : 150;
-      let contextualLine = 0;
+      let stationTotal = 0;
+
+      for (let i = 0; i < world.bodies.length; i++) {
+        const body = world.bodies[i];
+        if (!body.isRemoved && body.kind === "station") {
+          stationTotal++;
+        }
+      }
 
       ctx.save();
       ctx.fillStyle = "white";
@@ -9885,37 +9842,43 @@
       ctx.fillText("mouse apuntar", 20, 80);
       ctx.fillText("E tienda en estacion", 20, 100);
       ctx.fillText("Q bandos", 20, 120);
-      ctx.fillText("TAB sistema", 20, 140);
+      ctx.fillText(`cuerpos: ${world.bodies.length}`, 20, 150);
+      ctx.fillText(`procedurales: ${proceduralField.getProceduralCount()}`, 20, 170);
+      ctx.fillText(`particulas: ${world.particles.getActiveCount()}`, 20, 190);
+      ctx.fillText(`particulas en cache: ${world.particles.getPoolCount()}`, 20, 210);
+      ctx.fillText(`estaciones: ${stationTotal}`, 20, 230);
+      ctx.fillText(`pulgas: ${proceduralField.getFleaCount()}`, 20, 250);
+      ctx.fillText(`mineros: ${proceduralField.getMinerCount()}`, 20, 270);
+      ctx.fillText(`tarántulas: ${proceduralField.getTarantulaCount()}`, 20, 290);
+      ctx.fillText(`velocidad: ${speed.toFixed(2)}`, 20, 310);
+      ctx.fillText(`pos: (${playerShip.x.toFixed(1)}, ${playerShip.y.toFixed(1)})`, 20, 330);
 
       if (testCheats.testMode) {
         ctx.fillStyle = "#7ddcff";
-        ctx.fillText(`modo pruebas: ON | invulnerable ${testCheats.invincibility ? 'SI' : 'NO'} | spawns ${proceduralField.spawnsEnabled ? 'ON' : 'OFF'}`, 20, 160);
+        ctx.fillText(`modo pruebas: ON | invulnerable ${testCheats.invincibility ? 'SI' : 'NO'} | spawns ${proceduralField.spawnsEnabled ? 'ON' : 'OFF'}`, 20, 360);
         if (testCheats.dragTarget && !testCheats.dragTarget.isRemoved) {
-          ctx.fillText(`objeto sujeto con C: ${testCheats.dragTarget.kind}`, 20, 180);
+          ctx.fillText(`objeto sujeto con C: ${testCheats.dragTarget.kind}`, 20, 380);
         }
       }
-
-      const drawContextLine = (message, color = "white") => {
-        ctx.fillStyle = color;
-        ctx.fillText(message, 20, contextualBaseY + contextualLine * 24);
-        contextualLine++;
-      };
 
       if (nearbyStation && playerShip.isAlive && !shopState.isOpen) {
         const relation = factionSystem.getRelation(playerShip.faction, nearbyStation.faction);
         const disposition = factionSystem.getDisposition(playerShip.faction, nearbyStation.faction);
-        drawContextLine(
+        ctx.fillStyle = disposition === "enemy" ? "#ff7575" : "#7ddcff";
+        ctx.fillText(
           disposition === "enemy"
             ? "mercader hostil: no vendera"
             : disposition === "ally"
               ? `mercader aliado: recursos gratis | relacion ${Math.round(relation)}`
               : `mercader cerca: pulsa E para comprar | relacion ${Math.round(relation)}`,
-          disposition === "enemy" ? "#ff7575" : "#7ddcff"
+          20,
+          testCheats.testMode ? 400 : 360
         );
       }
 
       if (world.lastMerchantRefusalTimer > 0) {
-        drawContextLine("los mercaderes ambulantes no venden a enemigos", "#ff7575");
+        ctx.fillStyle = "#ff7575";
+        ctx.fillText("los mercaderes ambulantes no venden a enemigos", 20, testCheats.testMode ? 385 : 365);
       }
 
       if (playerShip.isTouchingPlanet && !playerShip.rechargeReady) {
@@ -9923,298 +9886,22 @@
         const missingAmmo = Math.max(0, playerShip.maxAmmo - playerShip.ammo) / 10;
         const missingHp = Math.max(0, playerShip.maxHp - playerShip.hp);
         const remainingSeconds = Math.max(missingFuel, missingAmmo, missingHp) * playerShip.refuelDelay;
-        drawContextLine(`reabastecimiento continuo: ${remainingSeconds.toFixed(1)} s restantes`, "#ffd45a");
+        ctx.fillStyle = "#ffd45a";
+        ctx.fillText(`reabastecimiento continuo: ${remainingSeconds.toFixed(1)} s restantes`, 20, testCheats.testMode ? 410 : 390);
       } else if (playerShip.isTouchingPlanet && playerShip.rechargeReady) {
-        drawContextLine("planeta: combustible, municion y vida completos", "#9dff9d");
+        ctx.fillStyle = "#9dff9d";
+        ctx.fillText("planeta: combustible, municion y vida completos", 20, testCheats.testMode ? 410 : 390);
       }
 
       if (!playerShip.isAlive) {
-        drawContextLine("estado: nave destruida", "#ff6666");
+        ctx.fillStyle = "#ff6666";
+        ctx.fillText("estado: nave destruida", 20, testCheats.testMode ? 440 : 420);
       }
 
       ctx.restore();
 
       drawRadar();
       drawResourcePanel();
-    }
-
-    // Construye un resumen del estado no esencial para mostrarlo en el panel de diagnostico.
-    function buildDiagnosticsSnapshot() {
-      const counts = {
-        totalBodies: 0,
-        asteroids: 0,
-        ships: 0,
-        scrap: 0,
-        coins: 0,
-        blueCoins: 0,
-        projectiles: 0,
-        planets: 0,
-        other: 0,
-        player: 0,
-        merchants: 0,
-        merchantEscorts: 0,
-        fleas: 0,
-        waspsSmall: 0,
-        waspsLarge: 0,
-        dragonfliesSmall: 0,
-        dragonfliesLarge: 0,
-        miners: 0,
-        tarantulas: 0
-      };
-
-      for (let i = 0; i < world.bodies.length; i++) {
-        const body = world.bodies[i];
-        if (!body || body.isRemoved) continue;
-        counts.totalBodies++;
-
-        if (body.kind === "asteroid") {
-          counts.asteroids++;
-        } else if (body.kind === "scrap") {
-          counts.scrap++;
-        } else if (body.kind === "coin") {
-          counts.coins++;
-          if (body.isBlueCoin) {
-            counts.blueCoins++;
-          }
-        } else if (body.kind === "projectile") {
-          counts.projectiles++;
-        } else if (body.kind === "planet") {
-          counts.planets++;
-        } else if (body.kind === "ship") {
-          counts.ships++;
-          counts.player++;
-        } else if (body.kind === "station") {
-          counts.ships++;
-          counts.merchants++;
-        } else if (body.kind === "merchantEscort") {
-          counts.ships++;
-          counts.merchantEscorts++;
-        } else if (body.kind === "miner") {
-          counts.ships++;
-          counts.miners++;
-        } else if (body.kind === "flea") {
-          counts.ships++;
-          counts.fleas++;
-        } else if (body.kind === "wasp") {
-          counts.ships++;
-          if (body.hullClass === "large") {
-            counts.waspsLarge++;
-          } else {
-            counts.waspsSmall++;
-          }
-        } else if (body.kind === "dragonfly") {
-          counts.ships++;
-          if (body.hullClass === "large") {
-            counts.dragonfliesLarge++;
-          } else {
-            counts.dragonfliesSmall++;
-          }
-        } else if (body.kind === "tarantula") {
-          counts.ships++;
-          counts.tarantulas++;
-        } else {
-          counts.other++;
-        }
-      }
-
-      return {
-        player: {
-          position: `(${playerShip.x.toFixed(1)}, ${playerShip.y.toFixed(1)})`,
-          linearSpeed: Math.hypot(playerShip.vx, playerShip.vy),
-          angularSpeed: playerShip.angularVelocity,
-          headingDeg: ((playerShip.angle * 180 / Math.PI) % 360 + 360) % 360,
-          hp: `${Math.ceil(playerShip.hp)} / ${Math.ceil(playerShip.maxHp)}`,
-          fuel: `${Math.ceil(playerShip.fuel)} / ${Math.ceil(playerShip.maxFuel)}`,
-          ammo: `${Number.isFinite(playerShip.ammo) ? Math.ceil(playerShip.ammo) : '∞'} / ${Number.isFinite(playerShip.maxAmmo) ? Math.ceil(playerShip.maxAmmo) : '∞'}`,
-          credits: Math.floor(playerShip.credits)
-        },
-        counts,
-        particles: {
-          active: world.particles.getActiveCount(),
-          pooled: world.particles.getPoolCount()
-        },
-        pools: {
-          projectiles: world.projectilePool.length,
-          asteroids: world.asteroidPool.length,
-          coins: world.coinPool.length
-        },
-        performance: {
-          fps: performanceMonitor.fps,
-          frameMs: performanceMonitor.frameDtMs
-        },
-        procedural: {
-          active: proceduralField.getProceduralCount(),
-          stations: proceduralField.getStationCount(),
-          merchantEscorts: proceduralField.getMerchantEscortCount(),
-          fleas: proceduralField.getFleaCount(),
-          wasps: proceduralField.getWaspCount(),
-          dragonflies: proceduralField.getDragonflyCount(),
-          miners: proceduralField.getMinerCount(),
-          tarantulas: proceduralField.getTarantulaCount(),
-          spawnsEnabled: proceduralField.spawnsEnabled
-        },
-        state: {
-          paused: isSimulationPaused(),
-          testMode: testCheats.testMode,
-          invincibility: testCheats.invincibility,
-          touchingPlanet: !!playerShip.isTouchingPlanet,
-          nearbyMerchant: !!findNearbyStation()
-        }
-      };
-    }
-
-    // Dibuja el panel de diagnostico desplazable con informacion secundaria del juego.
-    function drawDiagnosticsOverlay() {
-      if (!diagnosticsMenuState.isOpen) return;
-
-      const snapshot = buildDiagnosticsSnapshot();
-      const entries = [
-        { type: 'heading', text: 'JUGADOR' },
-        { label: 'Posicion', value: snapshot.player.position },
-        { label: 'Velocidad lineal', value: snapshot.player.linearSpeed.toFixed(2) },
-        { label: 'Velocidad angular', value: `${snapshot.player.angularSpeed.toFixed(3)} rad/s` },
-        { label: 'Rumbo', value: `${snapshot.player.headingDeg.toFixed(1)}°` },
-        { label: 'Vida', value: snapshot.player.hp },
-        { label: 'Combustible', value: snapshot.player.fuel },
-        { label: 'Municion', value: snapshot.player.ammo },
-        { label: 'Creditos', value: String(snapshot.player.credits) },
-
-        { type: 'heading', text: 'CUERPOS FISICOS' },
-        { label: 'Total', value: String(snapshot.counts.totalBodies) },
-        { label: 'Asteroides', value: String(snapshot.counts.asteroids) },
-        { label: 'Naves', value: String(snapshot.counts.ships) },
-        { label: 'Restos', value: String(snapshot.counts.scrap) },
-        { label: 'Monedas', value: String(snapshot.counts.coins) },
-        { label: 'Monedas azules', value: String(snapshot.counts.blueCoins) },
-        { label: 'Proyectiles', value: String(snapshot.counts.projectiles) },
-        { label: 'Planetas', value: String(snapshot.counts.planets) },
-        { label: 'Otros', value: String(snapshot.counts.other) },
-
-        { type: 'heading', text: 'NAVES POR TIPO' },
-        { label: 'Jugador', value: String(snapshot.counts.player) },
-        { label: 'Mercaderes', value: String(snapshot.counts.merchants) },
-        { label: 'Escoltas mercaderes', value: String(snapshot.counts.merchantEscorts) },
-        { label: 'Pulgas', value: String(snapshot.counts.fleas) },
-        { label: 'Avispas pequeñas', value: String(snapshot.counts.waspsSmall) },
-        { label: 'Avispas grandes', value: String(snapshot.counts.waspsLarge) },
-        { label: 'Libelulas pequeñas', value: String(snapshot.counts.dragonfliesSmall) },
-        { label: 'Libelulas grandes', value: String(snapshot.counts.dragonfliesLarge) },
-        { label: 'Mineros', value: String(snapshot.counts.miners) },
-        { label: 'Tarantulas', value: String(snapshot.counts.tarantulas) },
-
-        { type: 'heading', text: 'PARTICULAS Y POOLS' },
-        { label: 'Particulas activas', value: String(snapshot.particles.active) },
-        { label: 'Particulas en pool', value: String(snapshot.particles.pooled) },
-        { label: 'Proyectiles en pool', value: String(snapshot.pools.projectiles) },
-        { label: 'Asteroides en pool', value: String(snapshot.pools.asteroids) },
-        { label: 'Monedas en pool', value: String(snapshot.pools.coins) },
-
-        { type: 'heading', text: 'MUNDO Y RENDIMIENTO' },
-        { label: 'FPS', value: snapshot.performance.fps.toFixed(1) },
-        { label: 'Frame ms', value: snapshot.performance.frameMs.toFixed(2) },
-        { label: 'Procedurales activos', value: String(snapshot.procedural.active) },
-        { label: 'Mercaderes procedurales', value: String(snapshot.procedural.stations) },
-        { label: 'Escoltas procedurales', value: String(snapshot.procedural.merchantEscorts) },
-        { label: 'Pulgas procedurales', value: String(snapshot.procedural.fleas) },
-        { label: 'Avispas procedurales', value: String(snapshot.procedural.wasps) },
-        { label: 'Libelulas procedurales', value: String(snapshot.procedural.dragonflies) },
-        { label: 'Mineros procedurales', value: String(snapshot.procedural.miners) },
-        { label: 'Tarantulas procedurales', value: String(snapshot.procedural.tarantulas) },
-        { label: 'Spawns procedurales', value: snapshot.procedural.spawnsEnabled ? 'ON' : 'OFF' },
-
-        { type: 'heading', text: 'ESTADO' },
-        { label: 'Simulacion en pausa', value: snapshot.state.paused ? 'SI' : 'NO' },
-        { label: 'Modo pruebas', value: snapshot.state.testMode ? 'ON' : 'OFF' },
-        { label: 'Invulnerabilidad', value: snapshot.state.invincibility ? 'SI' : 'NO' },
-        { label: 'Tocando planeta', value: snapshot.state.touchingPlanet ? 'SI' : 'NO' },
-        { label: 'Mercader cercano', value: snapshot.state.nearbyMerchant ? 'SI' : 'NO' }
-      ];
-
-      const panelWidth = Math.min(860, canvas.width - 36);
-      const panelHeight = Math.min(canvas.height - 36, 640);
-      const panelX = (canvas.width - panelWidth) * 0.5;
-      const panelY = (canvas.height - panelHeight) * 0.5;
-      const headerHeight = 108;
-      const footerHeight = 28;
-      const contentX = panelX + 26;
-      const contentY = panelY + headerHeight;
-      const contentW = panelWidth - 52;
-      const contentH = Math.max(80, panelHeight - headerHeight - footerHeight);
-      const topPadding = 10;
-      const bottomPadding = 10;
-      let contentHeight = topPadding + bottomPadding;
-      for (const entry of entries) {
-        contentHeight += entry.type === 'heading' ? 34 : 24;
-      }
-
-      diagnosticsMenuState.viewport = { x: contentX, y: contentY, w: contentW, h: contentH };
-      diagnosticsMenuState.maxScroll = Math.max(0, contentHeight - contentH);
-      clampMenuScroll(diagnosticsMenuState);
-
-      ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = 'rgba(10, 16, 24, 0.96)';
-      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 30px monospace';
-      ctx.fillText('SISTEMA', panelX + 26, panelY + 22);
-      ctx.font = '16px monospace';
-      ctx.fillStyle = 'rgba(255,255,255,0.78)';
-      ctx.fillText('TAB o ESC para cerrar. La simulacion esta en pausa.', panelX + 26, panelY + 66);
-      ctx.fillText('Informacion tecnica y de diagnostico del estado actual.', panelX + 26, panelY + 88);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(contentX, contentY, contentW, contentH);
-      ctx.clip();
-
-      let y = contentY + topPadding - diagnosticsMenuState.scrollOffset;
-      for (const entry of entries) {
-        if (entry.type === 'heading') {
-          if (y + 28 >= contentY && y <= contentY + contentH) {
-            ctx.fillStyle = 'rgba(255,255,255,0.12)';
-            ctx.fillRect(contentX, y - 4, contentW, 28);
-            ctx.fillStyle = '#7ddcff';
-            ctx.font = 'bold 18px monospace';
-            ctx.fillText(entry.text, contentX + 10, y + 2);
-          }
-          y += 34;
-          continue;
-        }
-
-        if (y + 20 >= contentY && y <= contentY + contentH) {
-          ctx.fillStyle = 'rgba(255,255,255,0.045)';
-          ctx.fillRect(contentX, y - 2, contentW, 22);
-          ctx.font = '15px monospace';
-          ctx.fillStyle = 'rgba(255,255,255,0.82)';
-          ctx.fillText(entry.label, contentX + 10, y + 2);
-          ctx.textAlign = 'right';
-          ctx.fillStyle = 'white';
-          ctx.fillText(entry.value, contentX + contentW - 14, y + 2);
-          ctx.textAlign = 'left';
-        }
-        y += 24;
-      }
-
-      ctx.restore();
-      drawVerticalScrollbar(panelX + panelWidth - 16, contentY, contentH, contentHeight, diagnosticsMenuState.scrollOffset, 'rgba(125, 220, 255, 0.95)');
-
-      if (diagnosticsMenuState.maxScroll > 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '13px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('Rueda, flechas o RePag/AvPag para desplazar', canvas.width * 0.5, panelY + panelHeight - 18);
-      }
-
-      ctx.restore();
     }
 
     // Dibuja la faccion overlay en el contexto de render correspondiente.
@@ -10489,7 +10176,6 @@
       world.draw(ctx, camera, canvas.width, canvas.height);
       drawBrakeLockIndicator();
       drawHUD();
-      drawDiagnosticsOverlay();
       drawFactionOverlay();
       drawShopOverlay();
       drawPauseOverlay();
@@ -10521,14 +10207,10 @@
 
     // Gestiona game loop dentro del flujo principal del juego.
     function gameLoop(currentTime) {
-      const rawDt = Math.max(1 / 240, (currentTime - lastTime) / 1000);
+      let dt = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
 
-      performanceMonitor.frameDtMs = rawDt * 1000;
-      performanceMonitor.smoothedFrameDt += (rawDt - performanceMonitor.smoothedFrameDt) * performanceMonitor.smoothing;
-      performanceMonitor.fps = 1 / Math.max(1e-6, performanceMonitor.smoothedFrameDt);
-
-      let dt = clamp(rawDt, 0, 0.05);
+      dt = clamp(dt, 0, 0.05);
 
       if (!world.isGameOver && !isSimulationPaused()) {
         tickSimulation(dt);
@@ -10547,8 +10229,6 @@
       shopState,
       factionSystem,
       factionMenuState,
-      diagnosticsMenuState,
-      performanceMonitor,
       keys,
       testCheats,
       findNearbyStation,
