@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asteroids 0.6.3</title>
+  <title>Asteroids 0.7.11</title>
   <style>
     html, body {
       margin: 0;
@@ -201,6 +201,19 @@
           if (!this.testMode) {
             this.invincibility = false;
             this.dragTarget = null;
+            if (typeof audioChordOverlayState !== "undefined") {
+              audioChordOverlayState.isOpen = false;
+            }
+            if (typeof audioDebugMenuState !== "undefined") {
+              audioDebugMenuState.isOpen = false;
+              audioDebugMenuState.hoverIndex = -1;
+              audioDebugMenuState.buttons = [];
+              audioDebugMenuState.scrollOffset = 0;
+            }
+            if (typeof audioTensionDebugMenuState !== "undefined") {
+              audioTensionDebugMenuState.isOpen = false;
+              audioTensionDebugMenuState.scrollOffset = 0;
+            }
           }
           this.syncGlobalFlag();
         },
@@ -1115,6 +1128,3399 @@
       return `rgb(${clamp(Math.round(base.r + randomBetween(-channelVariance, channelVariance)), 0, 255)}, ${clamp(Math.round(base.g + randomBetween(-channelVariance, channelVariance)), 0, 255)}, ${clamp(Math.round(base.b + randomBetween(-channelVariance, channelVariance)), 0, 255)})`;
     }
 
+
+const AUDIO_NOTE_REGISTER_PRESETS = {
+  sub: [-36, -24, -12],
+  low: [-24, -12, 0],
+  midLow: [-12, 0, 12],
+  mid: [0, 12],
+  midHigh: [0, 12, 24],
+  high: [12, 24],
+  sparkle: [24, 36]
+};
+
+const SHIP_AUDIO_REGISTER_RULES = {
+  default: { shot: 'mid', thruster: 'midLow', turn: 'mid', destruction: 'low' },
+  ship: { shot: 'mid', thruster: 'midLow', turn: 'mid', destruction: 'low' },
+  station: { shot: 'midLow', thruster: 'low', turn: 'midLow', destruction: 'low' },
+  merchantEscort: { shot: 'midHigh', thruster: 'mid', turn: 'high', destruction: 'midLow' },
+  flea: { shot: 'high', thruster: 'midHigh', turn: 'high', destruction: 'mid' },
+  wasp: { shot: 'high', thruster: 'midHigh', turn: 'high', destruction: 'midLow' },
+  dragonfly: { shot: 'midHigh', thruster: 'mid', turn: 'high', destruction: 'midLow' },
+  miner: { shot: 'low', thruster: 'low', turn: 'midLow', destruction: 'low' },
+  carrier: { shot: 'low', thruster: 'low', turn: 'midLow', destruction: 'sub' },
+  interceptor: { shot: 'high', thruster: 'midHigh', turn: 'high', destruction: 'mid' },
+  tarantula: { shot: 'midLow', thruster: 'low', turn: 'mid', destruction: 'sub' },
+  planet: { collision: 'sub', destruction: 'sub' },
+  asteroid: { collision: 'low', destruction: 'low' },
+  scrap: { collision: 'midLow', destruction: 'midLow' },
+  coin: { collision: 'high' },
+  blueCoin: { collision: 'sparkle' }
+};
+
+const FACTION_AUDIO_PROFILES = {
+  "jugador": {
+    rootMidi: 57,
+    stepDuration: 1.85,
+    progression: [[0, 4, 7, 11], [0, 2, 7, 11], [0, 5, 7, 10], [0, 4, 9, 11]],
+    toneWave: "triangle",
+    accentWave: "sine",
+    shotFilter: 2450,
+    shotNoiseFilter: 3400,
+    thrusterFilter: 1450,
+    turnFilter: 2000,
+    impactFilter: 1350,
+    brightness: 1.05,
+    distortion: 0.04,
+    shotNoiseMix: 0.28,
+    flutter: 0.012,
+    texture: "clean"
+  },
+  "Mercader Ambulante": {
+    rootMidi: 50,
+    stepDuration: 2.45,
+    progression: [[0, 4, 7, 9], [0, 5, 7, 9], [0, 2, 7, 9]],
+    toneWave: "triangle",
+    accentWave: "sine",
+    shotFilter: 1650,
+    shotNoiseFilter: 2200,
+    thrusterFilter: 820,
+    turnFilter: 1250,
+    impactFilter: 760,
+    brightness: 0.78,
+    distortion: 0.02,
+    shotNoiseMix: 0.16,
+    flutter: 0.006,
+    texture: "calm"
+  },
+  "Pulgas": {
+    rootMidi: 63,
+    stepDuration: 1.02,
+    progression: [[0, 1, 7], [0, 3, 6], [0, 1, 8], [0, 4, 7, 10]],
+    toneWave: "square",
+    accentWave: "sawtooth",
+    shotFilter: 3600,
+    shotNoiseFilter: 5200,
+    thrusterFilter: 2400,
+    turnFilter: 3000,
+    impactFilter: 1700,
+    brightness: 1.25,
+    distortion: 0.18,
+    shotNoiseMix: 0.46,
+    flutter: 0.05,
+    texture: "fizzy"
+  },
+  "Avispas": {
+    rootMidi: 52,
+    stepDuration: 1.18,
+    progression: [[0, 3, 6, 10], [0, 5, 8, 10], [0, 1, 6, 10], [0, 3, 7, 10]],
+    toneWave: "square",
+    accentWave: "sawtooth",
+    shotFilter: 3200,
+    shotNoiseFilter: 4700,
+    thrusterFilter: 1950,
+    turnFilter: 2850,
+    impactFilter: 1550,
+    brightness: 1.22,
+    distortion: 0.16,
+    shotNoiseMix: 0.4,
+    flutter: 0.024,
+    texture: "metallic"
+  },
+  "Libélulas": {
+    rootMidi: 55,
+    stepDuration: 1.62,
+    progression: [[0, 4, 7, 9], [0, 2, 7, 9], [0, 5, 7, 11], [0, 4, 9, 11]],
+    toneWave: "sine",
+    accentWave: "triangle",
+    shotFilter: 2350,
+    shotNoiseFilter: 3100,
+    thrusterFilter: 920,
+    turnFilter: 2200,
+    impactFilter: 1100,
+    brightness: 0.96,
+    distortion: 0.03,
+    shotNoiseMix: 0.24,
+    flutter: 0.032,
+    texture: "liquid"
+  },
+  "Mineros": {
+    rootMidi: 43,
+    stepDuration: 2.32,
+    progression: [[0, 3, 7, 10], [0, 5, 7, 10], [0, 2, 5, 9], [0, 3, 7, 8]],
+    toneWave: "square",
+    accentWave: "triangle",
+    shotFilter: 1260,
+    shotNoiseFilter: 1800,
+    thrusterFilter: 540,
+    turnFilter: 960,
+    impactFilter: 700,
+    brightness: 0.72,
+    distortion: 0.09,
+    shotNoiseMix: 0.22,
+    flutter: 0.008,
+    texture: "industrial"
+  },
+  "Portanaves": {
+    rootMidi: 47,
+    stepDuration: 2.6,
+    progression: [[0, 4, 7, 11], [0, 5, 7, 10], [0, 2, 7, 11], [0, 4, 9, 11], [0, 5, 9, 11]],
+    toneWave: "triangle",
+    accentWave: "square",
+    shotFilter: 1480,
+    shotNoiseFilter: 1950,
+    thrusterFilter: 620,
+    turnFilter: 1080,
+    impactFilter: 860,
+    brightness: 0.8,
+    distortion: 0.06,
+    shotNoiseMix: 0.18,
+    flutter: 0.006,
+    texture: "organized"
+  },
+  "Tarántulas": {
+    rootMidi: 38,
+    stepDuration: 1.38,
+    progression: [[0, 1, 6, 10], [0, 3, 6, 9], [0, 1, 7, 10]],
+    toneWave: "sawtooth",
+    accentWave: "square",
+    shotFilter: 1320,
+    shotNoiseFilter: 1900,
+    thrusterFilter: 460,
+    turnFilter: 980,
+    impactFilter: 680,
+    brightness: 0.62,
+    distortion: 0.42,
+    shotNoiseMix: 0.36,
+    flutter: 0.015,
+    texture: "predatory"
+  }
+};
+
+const BIOME_AUDIO_PROFILES = {
+  black: {
+    id: "black",
+    ambientRootMidi: 34,
+    ambientIntervals: [0, 7, 12, 16],
+    ambientProgression: [[0, 7, 12, 16], [0, 5, 12, 17], [-2, 7, 14, 19], [0, 7, 12, 16]],
+    stepDuration: 6.4,
+    harmonicMood: "calma / vacío abierto",
+    ambientNoiseFilter: 320,
+    ambientNoiseGain: 0.011,
+    ambientToneGain: 0.008,
+    uiRootMidi: 62,
+    uiIntervals: [0, 7, 12],
+    physicsFilter: 760,
+    physicsResonance: 2.6,
+    lfoRate: 0.11,
+    lfoDepth: 0.08
+  },
+  gray: {
+    id: "gray",
+    ambientRootMidi: 38,
+    ambientIntervals: [0, 3, 7, 10],
+    ambientProgression: [[0, 3, 7, 10], [0, 2, 7, 10], [-1, 3, 6, 10], [0, 5, 8, 10]],
+    stepDuration: 3.2,
+    harmonicMood: "industria / maquinaria menor",
+    ambientNoiseFilter: 520,
+    ambientNoiseGain: 0.019,
+    ambientToneGain: 0.011,
+    uiRootMidi: 60,
+    uiIntervals: [0, 5, 12],
+    physicsFilter: 920,
+    physicsResonance: 2.1,
+    lfoRate: 0.15,
+    lfoDepth: 0.12
+  },
+  orange: {
+    id: "orange",
+    ambientRootMidi: 44,
+    ambientIntervals: [0, 3, 6, 10],
+    ambientProgression: [[0, 3, 7, 10], [0, 1, 7, 10], [-2, 3, 7, 10], [0, 3, 6, 10]],
+    stepDuration: 2.35,
+    harmonicMood: "guerra / marcha agresiva",
+    ambientNoiseFilter: 980,
+    ambientNoiseGain: 0.03,
+    ambientToneGain: 0.01,
+    uiRootMidi: 66,
+    uiIntervals: [0, 3, 10],
+    physicsFilter: 1420,
+    physicsResonance: 3.2,
+    lfoRate: 0.24,
+    lfoDepth: 0.18
+  },
+  red: {
+    id: "red",
+    ambientRootMidi: 41,
+    ambientIntervals: [0, 3, 7, 10],
+    ambientProgression: [[0, 3, 7, 10], [0, 3, 8, 10], [-1, 3, 7, 10], [0, 4, 7, 10]],
+    stepDuration: 2.85,
+    harmonicMood: "calor / presión hostil",
+    ambientNoiseFilter: 840,
+    ambientNoiseGain: 0.025,
+    ambientToneGain: 0.012,
+    uiRootMidi: 64,
+    uiIntervals: [0, 3, 7],
+    physicsFilter: 1180,
+    physicsResonance: 2.8,
+    lfoRate: 0.2,
+    lfoDepth: 0.14
+  },
+  yellow: {
+    id: "yellow",
+    ambientRootMidi: 47,
+    ambientIntervals: [0, 4, 7, 11],
+    ambientProgression: [[0, 4, 7, 11], [0, 2, 7, 9], [-2, 4, 7, 11], [0, 5, 9, 11]],
+    stepDuration: 3.55,
+    harmonicMood: "energía / alerta brillante",
+    ambientNoiseFilter: 1180,
+    ambientNoiseGain: 0.023,
+    ambientToneGain: 0.014,
+    uiRootMidi: 69,
+    uiIntervals: [0, 4, 11],
+    physicsFilter: 1680,
+    physicsResonance: 2.35,
+    lfoRate: 0.17,
+    lfoDepth: 0.1
+  },
+  purple: {
+    id: "purple",
+    ambientRootMidi: 36,
+    ambientIntervals: [0, 1, 6, 10],
+    ambientProgression: [[0, 1, 6, 10], [0, 3, 6, 9], [-1, 1, 6, 10], [0, 2, 6, 11]],
+    stepDuration: 2.1,
+    harmonicMood: "peligro / disonancia depredadora",
+    ambientNoiseFilter: 760,
+    ambientNoiseGain: 0.032,
+    ambientToneGain: 0.015,
+    uiRootMidi: 63,
+    uiIntervals: [0, 6, 10],
+    physicsFilter: 1280,
+    physicsResonance: 3.4,
+    lfoRate: 0.28,
+    lfoDepth: 0.2
+  }
+};
+
+const COLLISION_BODY_AUDIO_BASE = {
+  coin: { baseGain: 0.06, noiseGain: 0.02, baseFilter: 2400, duration: 0.1, wave: "sine" },
+  blueCoin: { baseGain: 0.08, noiseGain: 0.03, baseFilter: 2600, duration: 0.12, wave: "triangle" },
+  scrap: { baseGain: 0.065, noiseGain: 0.045, baseFilter: 1800, duration: 0.14, wave: "square" },
+  asteroid: { baseGain: 0.075, noiseGain: 0.065, baseFilter: 840, duration: 0.18, wave: "triangle" },
+  planet: { baseGain: 0.12, noiseGain: 0.1, baseFilter: 260, duration: 0.34, wave: "sine" },
+  ship: { baseGain: 0.08, noiseGain: 0.055, baseFilter: 960, duration: 0.16, wave: "triangle" },
+  station: { baseGain: 0.095, noiseGain: 0.07, baseFilter: 760, duration: 0.18, wave: "square" },
+  merchantEscort: { baseGain: 0.07, noiseGain: 0.05, baseFilter: 1260, duration: 0.13, wave: "triangle" },
+  wasp: { baseGain: 0.072, noiseGain: 0.06, baseFilter: 1320, duration: 0.14, wave: "square" },
+  dragonfly: { baseGain: 0.074, noiseGain: 0.055, baseFilter: 1180, duration: 0.15, wave: "triangle" },
+  miner: { baseGain: 0.092, noiseGain: 0.08, baseFilter: 720, duration: 0.2, wave: "square" },
+  carrier: { baseGain: 0.12, noiseGain: 0.085, baseFilter: 520, duration: 0.28, wave: "triangle" },
+  tarantula: { baseGain: 0.11, noiseGain: 0.09, baseFilter: 600, duration: 0.24, wave: "sawtooth" },
+  interceptor: { baseGain: 0.065, noiseGain: 0.05, baseFilter: 1460, duration: 0.12, wave: "square" },
+  flea: { baseGain: 0.06, noiseGain: 0.05, baseFilter: 1600, duration: 0.11, wave: "square" },
+  default: { baseGain: 0.07, noiseGain: 0.05, baseFilter: 1000, duration: 0.14, wave: "triangle" }
+};
+
+const AUDIO_EVENT_IMPORTANCE = {
+  shot: 1.8,
+  thruster: 1.1,
+  turn: 0.9,
+  projectileImpact: 2.2,
+  shipDestroyed: 5.5,
+  physicalCollision: 1.8,
+  asteroidBroken: 2.6,
+  asteroidAbsorbed: 2.8,
+  planetDestroyed: 7.8,
+  coinCollected: 3.2,
+  scrapCollected: 1.6,
+  scrapDestroyed: 1.9,
+  menuOpen: 4.1,
+  menuClose: 3.5,
+  purchase: 4.6,
+  uiError: 3.8,
+  interceptorLaunch: 3.3
+};
+
+const AUDIO_EVENT_RANGE = {
+  shot: 1700,
+  thruster: 1000,
+  turn: 800,
+  projectileImpact: 1800,
+  shipDestroyed: 2600,
+  physicalCollision: 1450,
+  asteroidBroken: 2000,
+  asteroidAbsorbed: 2400,
+  planetDestroyed: 4200,
+  coinCollected: 1250,
+  scrapCollected: 900,
+  scrapDestroyed: 1200,
+  interceptorLaunch: 2200
+};
+
+const AUDIO_EVENT_VOICE_COST = {
+  shot: 2,
+  thruster: 2,
+  turn: 1,
+  projectileImpact: 2,
+  shipDestroyed: 2,
+  physicalCollision: 2,
+  asteroidBroken: 2,
+  asteroidAbsorbed: 2,
+  planetDestroyed: 2,
+  coinCollected: 1,
+  scrapCollected: 2,
+  scrapDestroyed: 1,
+  menuOpen: 2,
+  menuClose: 2,
+  purchase: 4,
+  uiError: 2,
+  interceptorLaunch: 2
+};
+
+const AUDIO_EVENT_FRAME_BUDGET = {
+  shot: 3,
+  thruster: 2,
+  turn: 1,
+  projectileImpact: 3,
+  shipDestroyed: 2,
+  physicalCollision: 2,
+  asteroidBroken: 2,
+  asteroidAbsorbed: 1,
+  planetDestroyed: 1,
+  coinCollected: 2,
+  scrapCollected: 1,
+  scrapDestroyed: 1,
+  menuOpen: 1,
+  menuClose: 1,
+  purchase: 1,
+  uiError: 1,
+  interceptorLaunch: 2
+};
+
+const AUDIO_TENSION_BASE_BY_BIOME = {
+  black: 0,
+  gray: 0,
+  orange: 0.4,
+  red: 0,
+  yellow: 0,
+  purple: 0.6
+};
+
+const AUDIO_TENSION_BIOME_FACTION_RULES = {
+  red: "Libélulas",
+  yellow: "Avispas"
+};
+
+const AUDIO_TENSION_THREAT_BY_KIND = {
+  flea: 0.02,
+  interceptor: 0.07,
+  merchantEscort: 0.08,
+  ship: 0.1,
+  station: 0.12,
+  wasp: 0.12,
+  dragonfly: 0.12,
+  miner: 0.12,
+  carrier: 0.5,
+  tarantula: 0.5,
+  default: 0.1
+};
+
+const AUDIO_TENSION_THREAT_RANGE = 1850;
+const AUDIO_TENSION_THREAT_CLOSE_RANGE = 170;
+const AUDIO_TENSION_CONDITION_CAP = 0.85;
+const AUDIO_TENSION_RISE_RATE = 0.22;
+const AUDIO_TENSION_FALL_RATE = 0.005;
+const AUDIO_TENSION_IMPULSE_DECAY_RATE = 0.0075;
+const AUDIO_TENSION_IMPULSE_CAP = 0.55;
+const AUDIO_TENSION_PROJECTILE_NEAR_RANGE = 500;
+const AUDIO_TENSION_PROJECTILE_VERY_NEAR_RANGE = 200;
+const AUDIO_TENSION_PROJECTILE_NEAR_IMPULSE = 0.012;
+const AUDIO_TENSION_PROJECTILE_VERY_NEAR_IMPULSE = 0.035;
+
+function moveTowardValue(current, target, maxDelta) {
+  if (!(maxDelta > 0)) {
+    return current;
+  }
+  if (current < target) {
+    return Math.min(target, current + maxDelta);
+  }
+  if (current > target) {
+    return Math.max(target, current - maxDelta);
+  }
+  return current;
+}
+
+const AUDIO_ENVELOPE_FLOOR_RATIO = 0.0005;
+const AUDIO_ENVELOPE_FLOOR_MIN = 0.0000001;
+const AUDIO_ENVELOPE_FLOOR_MAX = 0.00002;
+const AUDIO_MIN_RENDER_GAIN = 0.000008;
+const AUDIO_FINAL_ZERO_FADE = 0.018;
+const AUDIO_SOURCE_STOP_PADDING = 0.04;
+const AUDIO_NODE_DISCONNECT_PADDING = 0.085;
+const AUDIO_OUTPUT_SAFETY_FADE_MIN = 0.055;
+const AUDIO_OUTPUT_SAFETY_FADE_MAX = 0.18;
+const AUDIO_OUTPUT_LOW_FREQUENCY_CYCLES = 3.25;
+
+function getAudioEnvelopeFloor(peakGain = 1) {
+  const safePeak = Math.max(0, Number.isFinite(peakGain) ? peakGain : 0);
+  return clamp(safePeak * AUDIO_ENVELOPE_FLOOR_RATIO, AUDIO_ENVELOPE_FLOOR_MIN, AUDIO_ENVELOPE_FLOOR_MAX);
+}
+
+function shouldRenderAudioGain(peakGain = 0) {
+  return Number.isFinite(peakGain) && peakGain >= AUDIO_MIN_RENDER_GAIN;
+}
+
+function getAudioTailPadding({ filterQ = 0, distortion = 0 } = {}) {
+  const resonanceTail = clamp((Number.isFinite(filterQ) ? filterQ : 0) * 0.006, 0, 0.035);
+  const distortionTail = clamp((Number.isFinite(distortion) ? distortion : 0) * 0.06, 0, 0.035);
+  return AUDIO_NODE_DISCONNECT_PADDING + resonanceTail + distortionTail;
+}
+
+function getAudioOutputSafetyFadeDuration({ frequency = null, startFrequency = null, endFrequency = null, filterFrequency = null, filterQ = 0, distortion = 0 } = {}) {
+  const frequencyCandidates = [frequency, startFrequency, endFrequency, filterFrequency]
+    .filter((candidate) => Number.isFinite(candidate) && candidate > 20);
+  const lowestRelevantFrequency = frequencyCandidates.length > 0 ? Math.min(...frequencyCandidates) : 220;
+  const lowFrequencyFade = clamp(AUDIO_OUTPUT_LOW_FREQUENCY_CYCLES / Math.max(24, lowestRelevantFrequency), 0.018, 0.13);
+  const resonanceFade = clamp((Number.isFinite(filterQ) ? filterQ : 0) * 0.01, 0, 0.055);
+  const distortionFade = clamp((Number.isFinite(distortion) ? distortion : 0) * 0.08, 0, 0.045);
+  return clamp(
+    Math.max(AUDIO_OUTPUT_SAFETY_FADE_MIN, lowFrequencyFade) + resonanceFade + distortionFade,
+    AUDIO_OUTPUT_SAFETY_FADE_MIN,
+    AUDIO_OUTPUT_SAFETY_FADE_MAX
+  );
+}
+
+function scheduleAudioOutputSafetyFade(param, now, fadeStart, fadeDuration) {
+  const start = Math.max(now, Number.isFinite(fadeStart) ? fadeStart : now);
+  const duration = clamp(Number.isFinite(fadeDuration) ? fadeDuration : AUDIO_OUTPUT_SAFETY_FADE_MIN, 0.018, AUDIO_OUTPUT_SAFETY_FADE_MAX);
+  const end = start + duration;
+
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(1, now);
+  if (start > now) {
+    param.setValueAtTime(1, start);
+  }
+  param.linearRampToValueAtTime(0, end);
+  return end;
+}
+
+
+const AUDIO_DEBUG_EVENT_DEFINITIONS = [
+  { type: "shot", label: "Disparos", detail: "armas de naves y estaciones" },
+  { type: "thruster", label: "Propulsores", detail: "empuje y aceleracion de naves" },
+  { type: "turn", label: "Giros", detail: "rotacion y correccion angular" },
+  { type: "projectileImpact", label: "Impactos de proyectil", detail: "balas golpeando objetivos" },
+  { type: "shipDestroyed", label: "Naves destruidas", detail: "explosion o muerte de naves" },
+  { type: "physicalCollision", label: "Colisiones fisicas", detail: "choques entre cuerpos" },
+  { type: "asteroidBroken", label: "Ruptura de asteroides", detail: "fragmentacion o destruccion de asteroides" },
+  { type: "asteroidAbsorbed", label: "Asteroide absorbido", detail: "asteroide absorbido por planeta" },
+  { type: "planetDestroyed", label: "Planetas destruidos", detail: "choque destructivo entre planetas" },
+  { type: "coinCollected", label: "Monedas recogidas", detail: "monedas normales y azules" },
+  { type: "scrapCollected", label: "Scrap recogido", detail: "recoleccion de restos" },
+  { type: "scrapDestroyed", label: "Scrap destruido", detail: "restos rotos o eliminados" },
+  { type: "menuOpen", label: "Abrir menu", detail: "sonido de apertura de UI" },
+  { type: "menuClose", label: "Cerrar menu", detail: "sonido de cierre de UI" },
+  { type: "purchase", label: "Compra", detail: "compra de mejoras" },
+  { type: "uiError", label: "Error UI", detail: "accion invalida o bloqueada" },
+  { type: "interceptorLaunch", label: "Lanzar interceptor", detail: "portanaves desplegando interceptor" }
+];
+
+const AUDIO_DEBUG_EVENT_LABEL_BY_TYPE = Object.fromEntries(AUDIO_DEBUG_EVENT_DEFINITIONS.map((entry) => [entry.type, entry.label]));
+
+const AUDIO_DEBUG_CATEGORY_DEFINITIONS = [
+  { tag: "category:ambient", label: "Ambiente / bioma", detail: "capa continua de fondo" },
+  { tag: "category:faction", label: "Eventos de faccion", detail: "disparos, motores, giros y destrucciones tonales" },
+  { tag: "category:physics", label: "Fisica / entorno", detail: "colisiones, asteroides, planetas, scrap y monedas" },
+  { tag: "category:ui", label: "Sistema / interfaz", detail: "menus, compras y errores" }
+];
+
+const AUDIO_DEBUG_FACTION_EVENT_TYPES = ["shot", "thruster", "turn", "projectileImpact", "shipDestroyed", "interceptorLaunch"];
+const AUDIO_DEBUG_BODY_KINDS = ["asteroid", "planet", "scrap", "coin", "blueCoin", "ship", "station", "merchantEscort", "flea", "wasp", "dragonfly", "miner", "carrier", "tarantula", "interceptor"];
+
+function addAudioDebugTag(tags, tag) {
+  if (typeof tag === "string" && tag.length > 0) {
+    tags.add(tag);
+  }
+}
+
+function getAudioEventCategory(event) {
+  const type = event?.type;
+  if (event?.isUi || type === "menuOpen" || type === "menuClose" || type === "purchase" || type === "uiError") {
+    return "ui";
+  }
+  if (type === "shot" || type === "thruster" || type === "turn" || type === "shipDestroyed" || type === "interceptorLaunch") {
+    return "faction";
+  }
+  if (type === "projectileImpact" && event?.faction) {
+    return "faction";
+  }
+  return "physics";
+}
+
+function collectAudioFactionNames(event) {
+  const names = [];
+  const pushName = (name) => {
+    if (typeof name === "string" && name.length > 0 && !names.includes(name)) {
+      names.push(name);
+    }
+  };
+  pushName(event?.faction);
+  pushName(event?.emitter?.faction);
+  pushName(event?.subject?.faction);
+  pushName(event?.target?.faction);
+  pushName(event?.counterpart?.faction);
+  return names;
+}
+
+function collectAudioBodyTags(event, tags, role, body) {
+  if (!body) {
+    return;
+  }
+  const kind = getEmitterAudioKind(body);
+  if (!kind || kind === "default") {
+    return;
+  }
+  const type = event?.type ?? "unknown";
+  addAudioDebugTag(tags, `${role}:${kind}`);
+  addAudioDebugTag(tags, `body:${kind}`);
+  addAudioDebugTag(tags, `event:${type}:${role}:${kind}`);
+  addAudioDebugTag(tags, `event:${type}:body:${kind}`);
+}
+
+function getAudioEventTags(event) {
+  const tags = new Set();
+  if (!event || !event.type) {
+    return tags;
+  }
+
+  const type = event.type;
+  const category = getAudioEventCategory(event);
+  addAudioDebugTag(tags, `event:${type}`);
+  addAudioDebugTag(tags, `category:${category}`);
+
+  const factionNames = collectAudioFactionNames(event);
+  for (let i = 0; i < factionNames.length; i++) {
+    const factionName = factionNames[i];
+    addAudioDebugTag(tags, `faction:${factionName}`);
+    addAudioDebugTag(tags, `event:${type}:faction:${factionName}`);
+  }
+
+  collectAudioBodyTags(event, tags, "emitter", event.emitter);
+  collectAudioBodyTags(event, tags, "subject", event.subject);
+  collectAudioBodyTags(event, tags, "target", event.target);
+  collectAudioBodyTags(event, tags, "counterpart", event.counterpart);
+
+  if (event.isBlueCoin) {
+    addAudioDebugTag(tags, "variant:blueCoin");
+    addAudioDebugTag(tags, `event:${type}:variant:blueCoin`);
+  }
+  if (event.terminal) {
+    addAudioDebugTag(tags, "variant:terminal");
+    addAudioDebugTag(tags, `event:${type}:variant:terminal`);
+  }
+
+  return tags;
+}
+
+function midiToFrequency(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+const AUDIO_NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+function midiToNoteName(midi, includeOctave = true) {
+  const roundedMidi = Math.round(Number.isFinite(midi) ? midi : 60);
+  const noteIndex = ((roundedMidi % 12) + 12) % 12;
+  const noteName = AUDIO_NOTE_NAMES_SHARP[noteIndex] ?? "C";
+  if (!includeOctave) {
+    return noteName;
+  }
+  const octave = Math.floor(roundedMidi / 12) - 1;
+  return `${noteName}${octave}`;
+}
+
+function formatHarmonyChordNotes(harmony, includeOctave = true) {
+  if (!harmony || !Array.isArray(harmony.chord) || harmony.chord.length === 0) {
+    return "—";
+  }
+  return harmony.chord
+    .map((interval) => midiToNoteName((harmony.rootMidi ?? 60) + interval, includeOctave))
+    .join(" · ");
+}
+
+function weightedChoice(items, fallback = null) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return fallback;
+  }
+
+  let totalWeight = 0;
+  for (let i = 0; i < items.length; i++) {
+    totalWeight += Math.max(0, items[i].weight ?? 0);
+  }
+
+  if (!(totalWeight > 0)) {
+    return items[Math.floor(Math.random() * items.length)]?.value ?? fallback;
+  }
+
+  let remaining = Math.random() * totalWeight;
+  for (let i = 0; i < items.length; i++) {
+    remaining -= Math.max(0, items[i].weight ?? 0);
+    if (remaining <= 0) {
+      return items[i].value;
+    }
+  }
+
+  return items[items.length - 1]?.value ?? fallback;
+}
+
+function getFactionAudioProfile(factionName) {
+  return FACTION_AUDIO_PROFILES[factionName] ?? FACTION_AUDIO_PROFILES["jugador"];
+}
+
+function getBiomeAudioProfile(biomeId) {
+  return BIOME_AUDIO_PROFILES[biomeId] ?? BIOME_AUDIO_PROFILES.black;
+}
+
+function getBiomeDisplayName(biomeId) {
+  const band = BIOME_BANDS.find((entry) => entry.id === biomeId);
+  return band?.name ?? biomeId ?? "Bioma";
+}
+
+function getBodyDisplayName(kind) {
+  const labels = {
+    asteroid: "Asteroide",
+    planet: "Planeta",
+    scrap: "Chatarra",
+    coin: "Moneda",
+    blueCoin: "Moneda azul",
+    ship: "Jugador",
+    station: "Estacion",
+    merchantEscort: "Escolta mercader",
+    flea: "Pulga",
+    wasp: "Avispa",
+    dragonfly: "Libelula",
+    miner: "Minero",
+    carrier: "Portanaves",
+    tarantula: "Tarantula",
+    interceptor: "Interceptor"
+  };
+  return labels[kind] ?? kind ?? "Cuerpo";
+}
+
+function getEmitterAudioKind(body) {
+  if (!body) {
+    return "default";
+  }
+  if (body.isBlueCoin) {
+    return "blueCoin";
+  }
+  return body.kind ?? "default";
+}
+
+function getRegisterRule(kind, eventType, fallback = "mid") {
+  const profile = SHIP_AUDIO_REGISTER_RULES[kind] ?? SHIP_AUDIO_REGISTER_RULES.default;
+  return profile[eventType] ?? SHIP_AUDIO_REGISTER_RULES.default[eventType] ?? fallback;
+}
+
+function getBodyCollisionAudioBase(body) {
+  const kind = getEmitterAudioKind(body);
+  return COLLISION_BODY_AUDIO_BASE[kind] ?? (isShipLike(body) ? COLLISION_BODY_AUDIO_BASE.ship : COLLISION_BODY_AUDIO_BASE.default);
+}
+
+class FactionHarmonyState {
+  constructor(profiles) {
+    this.profiles = profiles;
+    this.states = new Map();
+  }
+
+  getState(factionName) {
+    const safeFaction = this.profiles[factionName] ? factionName : "jugador";
+    let state = this.states.get(safeFaction);
+    if (!state) {
+      state = {
+        factionName: safeFaction,
+        time: 0,
+        stepIndex: 0
+      };
+      this.states.set(safeFaction, state);
+    }
+    return state;
+  }
+
+  update(dt, enabled = true) {
+    if (!(dt > 0)) {
+      return;
+    }
+
+    for (const factionName of Object.keys(this.profiles)) {
+      const profile = this.profiles[factionName];
+      const state = this.getState(factionName);
+      if (!enabled) {
+        continue;
+      }
+
+      const stepDuration = Math.max(0.2, profile.stepDuration ?? 2);
+      state.time += dt;
+      const nextStep = Math.floor(state.time / stepDuration);
+      state.stepIndex = ((nextStep % profile.progression.length) + profile.progression.length) % profile.progression.length;
+    }
+  }
+
+  getCurrentHarmony(factionName) {
+    const profile = getFactionAudioProfile(factionName);
+    const state = this.getState(factionName);
+    const progression = profile.progression ?? [[0, 4, 7]];
+    const chord = progression[state.stepIndex % progression.length] ?? progression[0];
+    return {
+      factionName: state.factionName,
+      rootMidi: profile.rootMidi ?? 57,
+      chord,
+      stepIndex: state.stepIndex
+    };
+  }
+
+  getToneWeights(eventType, interval) {
+    const degree = ((interval % 12) + 12) % 12;
+    if (eventType === "shot") {
+      if (degree === 0) return 0.85;
+      if (degree === 7) return 1.15;
+      if (degree === 10 || degree === 11) return 1.0;
+      return 1.05;
+    }
+
+    if (eventType === "thruster") {
+      if (degree === 0) return 1.2;
+      if (degree === 7 || degree === 5) return 0.95;
+      return 0.8;
+    }
+
+    if (eventType === "turn" || eventType === "coin") {
+      if (degree === 0) return 0.7;
+      if (degree === 7 || degree === 11 || degree === 10 || degree === 9) return 1.2;
+      return 1;
+    }
+
+    if (eventType === "impact" || eventType === "destruction" || eventType === "collision") {
+      if (degree === 0) return 1.35;
+      if (degree === 7 || degree === 5) return 1.05;
+      return 0.72;
+    }
+
+    return 1;
+  }
+
+  pickNote(factionName, options = {}) {
+    const harmony = this.getCurrentHarmony(factionName);
+    const kind = options.emitterKind ?? "default";
+    const eventType = options.eventType ?? "shot";
+    const registerName = options.register ?? getRegisterRule(kind, eventType, "mid");
+    const octaves = AUDIO_NOTE_REGISTER_PRESETS[registerName] ?? AUDIO_NOTE_REGISTER_PRESETS.mid;
+    const candidates = [];
+
+    for (let i = 0; i < harmony.chord.length; i++) {
+      const interval = harmony.chord[i];
+      const toneWeight = this.getToneWeights(eventType, interval);
+      for (let j = 0; j < octaves.length; j++) {
+        const octave = octaves[j];
+        const registerBias = 1 - Math.abs(j - (octaves.length - 1) * 0.5) * 0.15;
+        candidates.push({
+          value: harmony.rootMidi + interval + octave,
+          weight: Math.max(0.01, toneWeight * registerBias)
+        });
+      }
+    }
+
+    return weightedChoice(candidates, harmony.rootMidi);
+  }
+}
+
+class BiomeHarmonyState {
+  constructor(profiles) {
+    this.profiles = profiles;
+    this.states = new Map();
+  }
+
+  getState(biomeId) {
+    const safeBiome = this.profiles[biomeId] ? biomeId : "black";
+    let state = this.states.get(safeBiome);
+    if (!state) {
+      state = {
+        biomeId: safeBiome,
+        time: 0,
+        stepIndex: 0
+      };
+      this.states.set(safeBiome, state);
+    }
+    return state;
+  }
+
+  update(dt, enabled = true, tension = 0) {
+    if (!(dt > 0)) {
+      return;
+    }
+
+    const safeTension = clamp(Number.isFinite(tension) ? tension : 0, 0, 1);
+    const tensionSpeedMultiplier = 1 + safeTension * 1.85;
+
+    for (const biomeId of Object.keys(this.profiles)) {
+      const profile = this.profiles[biomeId];
+      const state = this.getState(biomeId);
+      if (!enabled) {
+        continue;
+      }
+
+      const progression = profile.ambientProgression ?? [[0, 7, 12, 16]];
+      const stepDuration = Math.max(0.35, profile.stepDuration ?? 4);
+      state.time += dt * tensionSpeedMultiplier;
+      const nextStep = Math.floor(state.time / stepDuration);
+      state.stepIndex = ((nextStep % progression.length) + progression.length) % progression.length;
+    }
+  }
+
+  getCurrentHarmony(biomeId) {
+    const profile = getBiomeAudioProfile(biomeId);
+    const state = this.getState(profile.id ?? biomeId ?? "black");
+    const progression = profile.ambientProgression ?? [[0, 7, 12, 16]];
+    const chord = progression[state.stepIndex % progression.length] ?? progression[0];
+    const audibleRootMidi = profile.ambientChordRootMidi ?? ((profile.ambientRootMidi ?? 36) + 12);
+    return {
+      biomeId: state.biomeId,
+      rootMidi: audibleRootMidi,
+      chord,
+      stepIndex: state.stepIndex
+    };
+  }
+}
+
+class AudioSynthEngine {
+  constructor() {
+    this.context = null;
+    this.masterGain = null;
+    this.factionBus = null;
+    this.physicsBus = null;
+    this.uiBus = null;
+    this.ambientBus = null;
+    this.compressor = null;
+    this.noiseBuffer = null;
+    this.distortionCurveCache = new Map();
+  }
+
+  createContext() {
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+      return null;
+    }
+
+    try {
+      return new AudioContextCtor();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  ensureStarted() {
+    if (!this.context) {
+      this.context = this.createContext();
+      if (!this.context) {
+        return false;
+      }
+      this.buildGraph();
+    }
+
+    if (this.context.state === "suspended") {
+      this.context.resume().catch(() => {});
+    }
+
+    return true;
+  }
+
+  isReady() {
+    return !!this.context;
+  }
+
+  buildGraph() {
+    const ctx = this.context;
+    this.masterGain = ctx.createGain();
+    this.masterGain.gain.value = 0.18;
+
+    this.factionBus = ctx.createGain();
+    this.factionBus.gain.value = 1;
+    this.physicsBus = ctx.createGain();
+    this.physicsBus.gain.value = 0.94;
+    this.uiBus = ctx.createGain();
+    this.uiBus.gain.value = 1.05;
+    this.ambientBus = ctx.createGain();
+    this.ambientBus.gain.value = 0.62;
+
+    this.compressor = ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = -18;
+    this.compressor.knee.value = 18;
+    this.compressor.ratio.value = 6;
+    this.compressor.attack.value = 0.003;
+    this.compressor.release.value = 0.2;
+
+    this.factionBus.connect(this.masterGain);
+    this.physicsBus.connect(this.masterGain);
+    this.uiBus.connect(this.masterGain);
+    this.ambientBus.connect(this.masterGain);
+    this.masterGain.connect(this.compressor);
+    this.compressor.connect(ctx.destination);
+
+    this.noiseBuffer = this.createWhiteNoiseBuffer(2.2);
+  }
+
+  createWhiteNoiseBuffer(duration = 2) {
+    const ctx = this.context;
+    const frameCount = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < frameCount; i++) {
+      channel[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
+
+  getBus(category = "faction") {
+    if (category === "ui") return this.uiBus;
+    if (category === "physics") return this.physicsBus;
+    if (category === "ambient") return this.ambientBus;
+    return this.factionBus;
+  }
+
+  createOutputChain(category = "faction", pan = 0) {
+    const ctx = this.context;
+    const input = ctx.createGain();
+    let tail = input;
+    let panner = null;
+
+    if (typeof ctx.createStereoPanner === "function") {
+      panner = ctx.createStereoPanner();
+      panner.pan.value = clamp(pan, -1, 1);
+      tail.connect(panner);
+      tail = panner;
+    }
+
+    tail.connect(this.getBus(category));
+
+    return {
+      input,
+      disconnect() {
+        try {
+          input.disconnect();
+        } catch (error) {}
+        if (panner) {
+          try {
+            panner.disconnect();
+          } catch (error) {}
+        }
+      }
+    };
+  }
+
+  applyEnvelope(param, now, {
+    attack = 0.004,
+    peak = 1,
+    decay = 0.05,
+    sustainLevel = 0.35,
+    duration = 0.12,
+    release = 0.05
+  } = {}) {
+    const safePeak = Math.max(0, Number.isFinite(peak) ? peak : 0);
+    const minValue = getAudioEnvelopeFloor(safePeak);
+    const peakValue = Math.max(minValue, safePeak);
+    const sustainValue = Math.max(minValue, safePeak * Math.max(0.01, sustainLevel));
+    const start = Math.max(now, now + attack);
+    const stop = now + Math.max(0.02, duration);
+    const sustainStart = Math.min(stop, now + Math.max(0.001, attack) + Math.max(0.001, decay));
+    const sustainEnd = Math.max(sustainStart, stop - Math.max(0.002, release));
+    const silentAt = stop + AUDIO_FINAL_ZERO_FADE;
+
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(minValue, now);
+    param.linearRampToValueAtTime(peakValue, start);
+    param.exponentialRampToValueAtTime(sustainValue, sustainStart);
+    param.setValueAtTime(sustainValue, sustainEnd);
+    param.exponentialRampToValueAtTime(minValue, stop);
+    param.linearRampToValueAtTime(0, silentAt);
+    return silentAt;
+  }
+
+  getDistortionCurve(amount = 0) {
+    const safeAmount = clamp(amount, 0, 1);
+    const key = Math.round(safeAmount * 1000);
+    if (this.distortionCurveCache.has(key)) {
+      return this.distortionCurveCache.get(key);
+    }
+
+    const sampleCount = 2048;
+    const curve = new Float32Array(sampleCount);
+    const k = 5 + safeAmount * 280;
+    for (let i = 0; i < sampleCount; i++) {
+      const x = (i * 2) / sampleCount - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+
+    this.distortionCurveCache.set(key, curve);
+    return curve;
+  }
+
+  playOscillator({
+    category = "faction",
+    wave = "sine",
+    frequency = 440,
+    startTime = null,
+    duration = 0.12,
+    pan = 0,
+    peakGain = 0.1,
+    attack = 0.003,
+    decay = 0.05,
+    sustainLevel = 0.24,
+    release = 0.05,
+    filterType = null,
+    filterFrequency = 1200,
+    filterQ = 1,
+    distortion = 0,
+    detune = 0,
+    startFrequency = null,
+    endFrequency = null
+  } = {}) {
+    if (!this.context || !shouldRenderAudioGain(peakGain)) {
+      return 0;
+    }
+
+    const ctx = this.context;
+    const now = startTime ?? ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const output = this.createOutputChain(category, pan);
+    let tail = gain;
+    let filter = null;
+    let shaper = null;
+
+    osc.type = wave;
+    osc.frequency.setValueAtTime(Math.max(20, startFrequency ?? frequency), now);
+    if (typeof detune === "number" && detune !== 0) {
+      osc.detune.setValueAtTime(detune, now);
+    }
+    if (Number.isFinite(endFrequency) && endFrequency > 20 && Math.abs(endFrequency - (startFrequency ?? frequency)) > 0.01) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), now + Math.max(0.01, duration * 0.82));
+    }
+
+    if (filterType) {
+      filter = ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(Math.max(40, filterFrequency), now);
+      filter.Q.setValueAtTime(Math.max(0.0001, filterQ), now);
+      tail.connect(filter);
+      tail = filter;
+    }
+
+    if (distortion > 0.001) {
+      shaper = ctx.createWaveShaper();
+      shaper.curve = this.getDistortionCurve(distortion);
+      shaper.oversample = "2x";
+      tail.connect(shaper);
+      tail = shaper;
+    }
+
+    tail.connect(output.input);
+    const envelopeEndTime = this.applyEnvelope(gain.gain, now, {
+      attack,
+      peak: peakGain,
+      decay,
+      sustainLevel,
+      duration,
+      release
+    });
+    const outputFadeDuration = getAudioOutputSafetyFadeDuration({
+      frequency,
+      startFrequency: startFrequency ?? frequency,
+      endFrequency: endFrequency ?? frequency,
+      filterFrequency,
+      filterQ,
+      distortion
+    });
+    const outputSilentTime = scheduleAudioOutputSafetyFade(output.input.gain, now, envelopeEndTime, outputFadeDuration);
+    const sourceStopTime = outputSilentTime + AUDIO_SOURCE_STOP_PADDING;
+    const disconnectPadding = getAudioTailPadding({ filterQ, distortion });
+    osc.connect(gain);
+    osc.start(now);
+    osc.stop(sourceStopTime);
+    osc.onended = () => {
+      window.setTimeout(() => {
+        try {
+          osc.disconnect();
+        } catch (error) {}
+        try {
+          gain.disconnect();
+        } catch (error) {}
+        if (filter) {
+          try {
+            filter.disconnect();
+          } catch (error) {}
+        }
+        if (shaper) {
+          try {
+            shaper.disconnect();
+          } catch (error) {}
+        }
+        output.disconnect();
+      }, Math.max(0, disconnectPadding * 1000));
+    };
+    return sourceStopTime + disconnectPadding;
+  }
+
+  playNoiseBurst({
+    category = "physics",
+    startTime = null,
+    duration = 0.12,
+    pan = 0,
+    peakGain = 0.08,
+    attack = 0.002,
+    decay = 0.04,
+    sustainLevel = 0.18,
+    release = 0.05,
+    filterType = "bandpass",
+    filterFrequency = 1600,
+    filterQ = 1.2,
+    distortion = 0
+  } = {}) {
+    if (!this.context || !this.noiseBuffer || !shouldRenderAudioGain(peakGain)) {
+      return 0;
+    }
+
+    const ctx = this.context;
+    const now = startTime ?? ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = this.noiseBuffer;
+    const gain = ctx.createGain();
+    const output = this.createOutputChain(category, pan);
+    let tail = gain;
+    let filter = null;
+    let shaper = null;
+
+    if (filterType) {
+      filter = ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(Math.max(40, filterFrequency), now);
+      filter.Q.setValueAtTime(Math.max(0.0001, filterQ), now);
+      tail.connect(filter);
+      tail = filter;
+    }
+
+    if (distortion > 0.001) {
+      shaper = ctx.createWaveShaper();
+      shaper.curve = this.getDistortionCurve(distortion);
+      shaper.oversample = "2x";
+      tail.connect(shaper);
+      tail = shaper;
+    }
+
+    tail.connect(output.input);
+    const envelopeEndTime = this.applyEnvelope(gain.gain, now, {
+      attack,
+      peak: peakGain,
+      decay,
+      sustainLevel,
+      duration,
+      release
+    });
+    const outputFadeDuration = getAudioOutputSafetyFadeDuration({
+      filterFrequency,
+      filterQ,
+      distortion
+    });
+    const outputSilentTime = scheduleAudioOutputSafetyFade(output.input.gain, now, envelopeEndTime, outputFadeDuration);
+    const sourceStopTime = outputSilentTime + AUDIO_SOURCE_STOP_PADDING;
+    const disconnectPadding = getAudioTailPadding({ filterQ, distortion });
+    source.connect(gain);
+    source.start(now);
+    source.stop(sourceStopTime);
+    source.onended = () => {
+      window.setTimeout(() => {
+        try {
+          source.disconnect();
+        } catch (error) {}
+        try {
+          gain.disconnect();
+        } catch (error) {}
+        if (filter) {
+          try {
+            filter.disconnect();
+          } catch (error) {}
+        }
+        if (shaper) {
+          try {
+            shaper.disconnect();
+          } catch (error) {}
+        }
+        output.disconnect();
+      }, Math.max(0, disconnectPadding * 1000));
+    };
+    return sourceStopTime + disconnectPadding;
+  }
+}
+
+class AudioAmbientLayer {
+  constructor(engine) {
+    this.engine = engine;
+    this.started = false;
+    this.noiseSource = null;
+    this.noiseFilter = null;
+    this.noiseGain = null;
+    this.toneA = null;
+    this.toneB = null;
+    this.toneC = null;
+    this.toneD = null;
+    this.toneAGain = null;
+    this.toneBGain = null;
+    this.toneCGain = null;
+    this.toneDGain = null;
+    this.output = null;
+    this.hasInitializedFrequencies = false;
+  }
+
+  ensureStarted() {
+    if (this.started || !this.engine.ensureStarted()) {
+      return this.started;
+    }
+
+    const ctx = this.engine.context;
+    this.output = this.engine.createOutputChain("ambient", 0);
+    this.noiseSource = ctx.createBufferSource();
+    this.noiseSource.buffer = this.engine.noiseBuffer;
+    this.noiseSource.loop = true;
+    this.noiseFilter = ctx.createBiquadFilter();
+    this.noiseFilter.type = "bandpass";
+    this.noiseGain = ctx.createGain();
+    this.noiseGain.gain.value = 0.0001;
+    this.noiseSource.connect(this.noiseFilter);
+    this.noiseFilter.connect(this.noiseGain);
+    this.noiseGain.connect(this.output.input);
+
+    this.toneA = ctx.createOscillator();
+    this.toneA.type = "sine";
+    this.toneAGain = ctx.createGain();
+    this.toneAGain.gain.value = 0.0001;
+    this.toneA.connect(this.toneAGain);
+    this.toneAGain.connect(this.output.input);
+
+    this.toneB = ctx.createOscillator();
+    this.toneB.type = "triangle";
+    this.toneBGain = ctx.createGain();
+    this.toneBGain.gain.value = 0.0001;
+    this.toneB.connect(this.toneBGain);
+    this.toneBGain.connect(this.output.input);
+
+    this.toneC = ctx.createOscillator();
+    this.toneC.type = "sine";
+    this.toneCGain = ctx.createGain();
+    this.toneCGain.gain.value = 0.0001;
+    this.toneC.connect(this.toneCGain);
+    this.toneCGain.connect(this.output.input);
+
+    this.toneD = ctx.createOscillator();
+    this.toneD.type = "triangle";
+    this.toneDGain = ctx.createGain();
+    this.toneDGain.gain.value = 0.0001;
+    this.toneD.connect(this.toneDGain);
+    this.toneDGain.connect(this.output.input);
+
+    this.noiseSource.start();
+    this.toneA.start();
+    this.toneB.start();
+    this.toneC.start();
+    this.toneD.start();
+    this.started = true;
+    return true;
+  }
+
+  silence() {
+    if (!this.started || !this.engine?.context) {
+      return;
+    }
+    const now = this.engine.context.currentTime;
+    this.noiseGain?.gain?.setTargetAtTime(0.0001, now, 0.08);
+    this.toneAGain?.gain?.setTargetAtTime(0.0001, now, 0.08);
+    this.toneBGain?.gain?.setTargetAtTime(0.0001, now, 0.08);
+    this.toneCGain?.gain?.setTargetAtTime(0.0001, now, 0.08);
+    this.toneDGain?.gain?.setTargetAtTime(0.0001, now, 0.08);
+  }
+
+  getAmbientChordMidiNotes(biomeProfile, harmony) {
+    const rootMidi = harmony?.rootMidi ?? biomeProfile?.ambientChordRootMidi ?? ((biomeProfile?.ambientRootMidi ?? 36) + 12);
+    const chord = Array.isArray(harmony?.chord) && harmony.chord.length > 0
+      ? harmony.chord
+      : (biomeProfile?.ambientProgression?.[0] ?? biomeProfile?.ambientIntervals ?? [0, 7, 12, 16]);
+    const first = chord[0] ?? 0;
+    const second = chord[1] ?? 7;
+    const third = chord[2] ?? 12;
+    const fourth = chord[3] ?? (third + 4);
+    return [rootMidi + first, rootMidi + second, rootMidi + third, rootMidi + fourth];
+  }
+
+  initializeFrequenciesIfNeeded(now, toneAFrequency, toneBFrequency, toneCFrequency, toneDFrequency, noiseFilterFrequency, filterQ) {
+    if (this.hasInitializedFrequencies) {
+      return;
+    }
+
+    this.toneA.frequency.setValueAtTime(toneAFrequency, now);
+    this.toneB.frequency.setValueAtTime(toneBFrequency, now);
+    this.toneC.frequency.setValueAtTime(toneCFrequency, now);
+    this.toneD.frequency.setValueAtTime(toneDFrequency, now);
+    this.noiseFilter.frequency.setValueAtTime(noiseFilterFrequency, now);
+    this.noiseFilter.Q.setValueAtTime(filterQ, now);
+    this.hasInitializedFrequencies = true;
+  }
+
+  update(biomeProfile, timeSeconds = 0, harmony = null, tension = 0, activityDucking = 0) {
+    if (!this.ensureStarted() || !biomeProfile) {
+      return;
+    }
+
+    const ctx = this.engine.context;
+    const now = ctx.currentTime;
+    const safeTension = clamp(Number.isFinite(tension) ? tension : 0, 0, 1);
+    const safeDucking = clamp(Number.isFinite(activityDucking) ? activityDucking : 0, 0, 1);
+    const lfoDepth = biomeProfile.lfoDepth * (0.78 + safeTension * 1.25);
+    const lfo = 1 + Math.sin(timeSeconds * biomeProfile.lfoRate * Math.PI * 2) * lfoDepth;
+    const pulseRate = biomeProfile.ambientPulseRate ?? (0.045 + (biomeProfile.stepDuration ?? 4) * 0.0015);
+    const pulsePhase = biomeProfile.ambientPulsePhase ?? 0;
+    const rawPulse = 0.5 + 0.5 * Math.sin((timeSeconds * pulseRate + pulsePhase) * Math.PI * 2);
+    const shapedPulse = Math.pow(clamp(rawPulse, 0, 1), 2.85 - safeTension * 0.55);
+    const pulsePeak = 0.54;
+    const pulseFloor = 0.012 + safeTension * 0.14;
+    const pulseEnvelope = pulseFloor + shapedPulse * Math.max(0.001, pulsePeak - pulseFloor);
+    const chordNotes = this.getAmbientChordMidiNotes(biomeProfile, harmony);
+    const toneAFrequency = midiToFrequency(chordNotes[0]);
+    const toneBFrequency = midiToFrequency(chordNotes[1]);
+    const toneCFrequency = midiToFrequency(chordNotes[2]);
+    const toneDFrequency = midiToFrequency(chordNotes[3]);
+    const shimmer = 0.0015 + safeTension * 0.0075;
+    const toneBDetune = 1 + Math.sin(timeSeconds * (biomeProfile.lfoRate * 1.7 + 0.03)) * shimmer;
+    const toneCDetune = 1 + Math.sin(timeSeconds * (biomeProfile.lfoRate * 2.3 + 0.07)) * shimmer * 0.82;
+    const toneDDetune = 1 + Math.sin(timeSeconds * (biomeProfile.lfoRate * 2.9 + 0.11)) * shimmer * 0.58;
+    const brightness = 0.76 + safeTension * 0.76;
+    const toneGain = biomeProfile.ambientToneGain * 0.74 * pulseEnvelope;
+    const noiseGain = biomeProfile.ambientNoiseGain * 0.68 * pulseEnvelope;
+    const activityDuckingGain = 1 - safeDucking * 0.48;
+    const outputGain = 0.78 * activityDuckingGain;
+    const noiseFilterFrequency = Math.max(40, biomeProfile.ambientNoiseFilter * lfo * brightness);
+    const filterQ = Math.max(0.1, biomeProfile.physicsResonance * (0.34 + safeTension * 0.32));
+
+    this.initializeFrequenciesIfNeeded(now, toneAFrequency, toneBFrequency, toneCFrequency, toneDFrequency, noiseFilterFrequency, filterQ);
+
+    this.noiseFilter.frequency.setTargetAtTime(noiseFilterFrequency, now, 0.36);
+    this.noiseFilter.Q.setTargetAtTime(filterQ, now, 0.36);
+    this.noiseGain.gain.setTargetAtTime(Math.max(0.0001, noiseGain), now, 0.48);
+    this.output?.input?.gain?.setTargetAtTime(outputGain, now, 0.42);
+
+    this.toneA.frequency.setTargetAtTime(toneAFrequency, now, 0.16);
+    this.toneAGain.gain.setTargetAtTime(Math.max(0.0001, toneGain * 0.7), now, 0.46);
+    this.toneB.frequency.setTargetAtTime(toneBFrequency * toneBDetune, now, 0.18);
+    this.toneBGain.gain.setTargetAtTime(Math.max(0.0001, toneGain * 0.56), now, 0.46);
+    this.toneC.frequency.setTargetAtTime(toneCFrequency * toneCDetune, now, 0.2);
+    this.toneCGain.gain.setTargetAtTime(Math.max(0.0001, toneGain * 0.42), now, 0.46);
+    this.toneD.frequency.setTargetAtTime(toneDFrequency * toneDDetune, now, 0.22);
+    this.toneDGain.gain.setTargetAtTime(Math.max(0.0001, toneGain * 0.32), now, 0.46);
+  }
+}
+
+class AsteroidsAudioDirector {
+  constructor(options = {}) {
+    this.world = options.world ?? null;
+    this.player = options.player ?? null;
+    this.proceduralField = options.proceduralField ?? null;
+    this.engine = new AudioSynthEngine();
+    this.harmony = new FactionHarmonyState(FACTION_AUDIO_PROFILES);
+    this.biomeHarmony = new BiomeHarmonyState(BIOME_AUDIO_PROFILES);
+    this.ambient = new AudioAmbientLayer(this.engine);
+    this.ambientTension = 0;
+    this.ambientSustainedTension = 0;
+    this.ambientTargetTension = 0;
+    this.ambientBaseTension = 0;
+    this.ambientConditionTension = 0;
+    this.ambientThreatTension = 0;
+    this.ambientImpulseTension = 0;
+    this.ambientThreatSummary = [];
+    this.ambientEquilibriumSources = [];
+    this.ambientTensionImpulseLog = [];
+    this.queue = [];
+    this.activeVoiceUntil = [];
+    this.entityCooldowns = new Map();
+    this.stackCooldowns = new Map();
+    this.bodyMotionState = new Map();
+    this.projectileNearTensionIds = new Set();
+    this.projectileVeryNearTensionIds = new Set();
+    this.lastMotionCleanupAt = 0;
+    this.maxVoiceLoad = 22;
+    this.criticalVoiceReserve = 5;
+    this.maxEventsPerFrame = 9;
+    this.disabledAudioTags = new Set();
+  }
+
+  getNowSeconds() {
+    return performance.now() * 0.001;
+  }
+
+  isAudioTagDisabled(tag) {
+    return this.disabledAudioTags.has(tag);
+  }
+
+  isAudioTagEnabled(tag) {
+    return !this.isAudioTagDisabled(tag);
+  }
+
+  setAudioTagEnabled(tag, enabled = true) {
+    if (typeof tag !== "string" || tag.length === 0) {
+      return;
+    }
+    if (enabled) {
+      this.disabledAudioTags.delete(tag);
+    } else {
+      this.disabledAudioTags.add(tag);
+    }
+  }
+
+  toggleAudioTag(tag) {
+    if (this.isAudioTagDisabled(tag)) {
+      this.disabledAudioTags.delete(tag);
+      return true;
+    }
+    this.disabledAudioTags.add(tag);
+    return false;
+  }
+
+  setAmbientTension(value) {
+    this.ambientSustainedTension = clamp(Number.isFinite(value) ? value : this.ambientSustainedTension, 0, 1);
+    this.ambientTension = this.getEffectiveAmbientTension();
+    return this.ambientTension;
+  }
+
+  adjustAmbientTension(delta) {
+    this.addAmbientTensionImpulse(delta ?? 0);
+    return this.ambientTension;
+  }
+
+  getPlayerFactionName() {
+    return this.player?.faction ?? "jugador";
+  }
+
+  getBiomeBaseTensionInfo(biomeState = null) {
+    const resolvedBiomeState = biomeState ?? this.currentBiomeState();
+    const biomeId = resolvedBiomeState?.id ?? "black";
+    const biomeName = resolvedBiomeState?.name ?? getBiomeDisplayName(biomeId);
+    const factionName = AUDIO_TENSION_BIOME_FACTION_RULES[biomeId];
+    if (factionName && typeof factionSystem !== "undefined" && factionSystem?.getDisposition) {
+      const disposition = factionSystem.getDisposition(this.getPlayerFactionName(), factionName);
+      const amount = disposition === "enemy" ? 0.5 : 0;
+      return {
+        amount,
+        label: amount > 0 ? `Bioma ${biomeName}: faccion ${factionName} enemiga` : `Bioma ${biomeName}: faccion ${factionName} no hostil`,
+        detail: `base por relacion ${disposition}`,
+        kind: "biome"
+      };
+    }
+    const amount = AUDIO_TENSION_BASE_BY_BIOME[biomeId] ?? 0;
+    return {
+      amount,
+      label: `Bioma ${biomeName}`,
+      detail: amount > 0 ? "base natural del bioma" : "base natural en calma",
+      kind: "biome"
+    };
+  }
+
+  getBiomeBaseTension(biomeState = null) {
+    return this.getBiomeBaseTensionInfo(biomeState).amount;
+  }
+
+  getThreatBaseTension(body) {
+    const kind = getEmitterAudioKind(body);
+    let base = AUDIO_TENSION_THREAT_BY_KIND[kind] ?? AUDIO_TENSION_THREAT_BY_KIND.default;
+    if (body?.hullClass === "large" && kind !== "carrier" && kind !== "tarantula") {
+      base += 0.04;
+    }
+    return base;
+  }
+
+  getThreatDistanceFactor(distance) {
+    const range = Math.max(AUDIO_TENSION_THREAT_CLOSE_RANGE + 1, AUDIO_TENSION_THREAT_RANGE);
+    const linear = clamp(1 - (distance - AUDIO_TENSION_THREAT_CLOSE_RANGE) / (range - AUDIO_TENSION_THREAT_CLOSE_RANGE), 0, 1);
+    return Math.pow(linear, 1.35);
+  }
+
+  computeNearbyThreatTension() {
+    const world = this.world;
+    const player = this.player;
+    if (!world || !player || !player.isAlive) {
+      this.ambientThreatSummary = [];
+      return 0;
+    }
+
+    let total = 0;
+    const threats = [];
+    const considerBody = (body) => {
+      if (!body || body === player || body.isRemoved || body.isAlive === false || !isShipLike(body)) {
+        return;
+      }
+      const factionName = body.faction;
+      if (!factionName || typeof factionSystem === "undefined" || factionSystem.getDisposition(this.getPlayerFactionName(), factionName) !== "enemy") {
+        return;
+      }
+
+      const dx = body.x - player.x;
+      const dy = body.y - player.y;
+      const distance = Math.hypot(dx, dy);
+      if (!(distance <= AUDIO_TENSION_THREAT_RANGE)) {
+        return;
+      }
+
+      const distanceFactor = this.getThreatDistanceFactor(distance);
+      if (!(distanceFactor > 0)) {
+        return;
+      }
+
+      const base = this.getThreatBaseTension(body);
+      const contribution = base * distanceFactor;
+      if (!(contribution > 0)) {
+        return;
+      }
+
+      total += contribution;
+      if (contribution >= 0.005) {
+        threats.push({
+          kind: getEmitterAudioKind(body),
+          faction: factionName,
+          distance,
+          contribution
+        });
+      }
+    };
+
+    if (world.grid?.forEachNearbyUnique) {
+      const stamp = world.gravityQueryStamp++;
+      world.grid.forEachNearbyUnique(player.x, player.y, AUDIO_TENSION_THREAT_RANGE, stamp, considerBody);
+    } else if (Array.isArray(world.bodies)) {
+      for (let i = 0; i < world.bodies.length; i++) {
+        considerBody(world.bodies[i]);
+      }
+    }
+
+    threats.sort((a, b) => b.contribution - a.contribution);
+    this.ambientThreatSummary = threats.slice(0, 30);
+    return clamp(total, 0, AUDIO_TENSION_CONDITION_CAP);
+  }
+
+  computeAmbientTensionTarget(biomeState = null) {
+    const baseInfo = this.getBiomeBaseTensionInfo(biomeState);
+    const base = baseInfo.amount;
+    const threat = this.computeNearbyThreatTension();
+    const condition = clamp(threat, 0, AUDIO_TENSION_CONDITION_CAP);
+    this.ambientBaseTension = base;
+    this.ambientThreatTension = threat;
+    this.ambientConditionTension = condition;
+    this.ambientTargetTension = clamp(base + condition, 0, 1);
+
+    const sources = [];
+    if (base > 0.0001) {
+      sources.push({
+        amount: base,
+        label: baseInfo.label,
+        detail: baseInfo.detail,
+        kind: baseInfo.kind
+      });
+    }
+
+    for (let i = 0; i < this.ambientThreatSummary.length; i++) {
+      const threatInfo = this.ambientThreatSummary[i];
+      if (!(threatInfo.contribution > 0.0001)) continue;
+      sources.push({
+        amount: threatInfo.contribution,
+        label: `${getBodyDisplayName(threatInfo.kind)} enemigo cerca`,
+        detail: `${threatInfo.faction ?? "faccion desconocida"} · ${Math.round(threatInfo.distance ?? 0)}u`,
+        kind: "threat"
+      });
+    }
+
+    sources.sort((a, b) => b.amount - a.amount);
+    this.ambientEquilibriumSources = sources;
+    return this.ambientTargetTension;
+  }
+
+  getTensionImpulseLabel(label, detail = "") {
+    return {
+      label: typeof label === "string" && label.length > 0 ? label : "Impulso de tension",
+      detail: typeof detail === "string" ? detail : ""
+    };
+  }
+
+  recordAmbientTensionImpulse(amount, label = "Impulso de tension", detail = "") {
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    if (!(safeAmount > 0.0001)) {
+      return;
+    }
+    const resolved = this.getTensionImpulseLabel(label, detail);
+    this.ambientTensionImpulseLog.unshift({
+      amount: safeAmount,
+      label: resolved.label,
+      detail: resolved.detail,
+      time: this.world?.time ?? this.getNowSeconds()
+    });
+    if (this.ambientTensionImpulseLog.length > 100) {
+      this.ambientTensionImpulseLog.length = 100;
+    }
+  }
+
+  addAmbientTensionImpulse(amount, label = "Impulso de tension", detail = "") {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return this.ambientImpulseTension;
+    }
+    const previousImpulse = this.ambientImpulseTension;
+    this.ambientImpulseTension = clamp(this.ambientImpulseTension + amount, 0, AUDIO_TENSION_IMPULSE_CAP);
+    const applied = Math.max(0, this.ambientImpulseTension - previousImpulse);
+    this.recordAmbientTensionImpulse(applied, label, detail);
+    this.ambientTension = this.getEffectiveAmbientTension();
+    return this.ambientImpulseTension;
+  }
+
+  getTensionEventDistanceFactor(event) {
+    if (!event || event.isUi || !this.player) {
+      return 1;
+    }
+    const x = Number.isFinite(event.x) ? event.x : event.emitter?.x ?? event.subject?.x ?? event.target?.x;
+    const y = Number.isFinite(event.y) ? event.y : event.emitter?.y ?? event.subject?.y ?? event.target?.y;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return 1;
+    }
+    const distance = Math.hypot(x - this.player.x, y - this.player.y);
+    return this.getThreatDistanceFactor(distance);
+  }
+
+  registerAmbientTensionEvent(event) {
+    if (!event || !event.type) {
+      return;
+    }
+
+    const distanceFactor = this.getTensionEventDistanceFactor(event);
+    if (!(distanceFactor > 0)) {
+      return;
+    }
+
+    if (event.type === "shot") {
+      const shotCount = Math.max(1, event.stackCount ?? 1);
+      const amount = clamp(0.012 * shotCount * distanceFactor, 0.002, 0.035);
+      const source = event.emitter === this.player ? "del jugador" : (event.faction ? `de ${event.faction}` : "externo");
+      this.addAmbientTensionImpulse(amount, `Disparo ${source}`, `${shotCount} proyectil(es) · cercania ${Math.round(distanceFactor * 100)}%`);
+      return;
+    }
+
+    if (event.type === "shipDestroyed") {
+      const kind = getEmitterAudioKind(event.subject ?? event.emitter);
+      let amount = 0.15;
+      if (kind === "carrier" || kind === "tarantula") {
+        amount = 0.25;
+      } else if (event.subject?.hullClass === "large") {
+        amount = 0.2;
+      } else if (kind === "flea" || kind === "interceptor") {
+        amount = 0.08;
+      }
+      this.addAmbientTensionImpulse(amount * distanceFactor, "Nave explota", `${getBodyDisplayName(kind)} · cercania ${Math.round(distanceFactor * 100)}%`);
+    }
+  }
+
+  shouldProjectileAffectPlayerTension(projectile) {
+    if (!projectile || projectile.isRemoved || projectile.kind !== "projectile") {
+      return false;
+    }
+    return projectile.owner !== this.player;
+  }
+
+  registerProjectileNearMissTension(projectile, distanceSq) {
+    if (!this.shouldProjectileAffectPlayerTension(projectile) || !Number.isFinite(distanceSq)) {
+      return;
+    }
+
+    const projectileId = projectile.id;
+    if (projectileId == null) {
+      return;
+    }
+
+    const veryNearRangeSq = AUDIO_TENSION_PROJECTILE_VERY_NEAR_RANGE * AUDIO_TENSION_PROJECTILE_VERY_NEAR_RANGE;
+    const nearRangeSq = AUDIO_TENSION_PROJECTILE_NEAR_RANGE * AUDIO_TENSION_PROJECTILE_NEAR_RANGE;
+
+    if (distanceSq <= veryNearRangeSq && !this.projectileVeryNearTensionIds.has(projectileId)) {
+      this.projectileVeryNearTensionIds.add(projectileId);
+      this.projectileNearTensionIds.add(projectileId);
+      this.addAmbientTensionImpulse(AUDIO_TENSION_PROJECTILE_VERY_NEAR_IMPULSE, "Disparo pasa muy cerca", `${Math.round(Math.sqrt(distanceSq))}u del jugador`);
+      return;
+    }
+
+    if (distanceSq <= nearRangeSq && !this.projectileNearTensionIds.has(projectileId)) {
+      this.projectileNearTensionIds.add(projectileId);
+      this.addAmbientTensionImpulse(AUDIO_TENSION_PROJECTILE_NEAR_IMPULSE, "Disparo pasa cerca", `${Math.round(Math.sqrt(distanceSq))}u del jugador`);
+    }
+  }
+
+  captureProjectileNearMissTension() {
+    const world = this.world;
+    const player = this.player;
+    if (!world || !player || !player.isAlive) {
+      return;
+    }
+
+    const range = AUDIO_TENSION_PROJECTILE_NEAR_RANGE;
+    const rangeSq = range * range;
+    const considerProjectile = (projectile) => {
+      if (!this.shouldProjectileAffectPlayerTension(projectile)) {
+        return;
+      }
+      const dx = projectile.x - player.x;
+      const dy = projectile.y - player.y;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq <= rangeSq) {
+        this.registerProjectileNearMissTension(projectile, distanceSq);
+      }
+    };
+
+    if (world.grid?.forEachNearbyUnique) {
+      const stamp = world.gravityQueryStamp++;
+      world.grid.forEachNearbyUnique(player.x, player.y, range, stamp, considerProjectile);
+    } else if (Array.isArray(world.bodies)) {
+      for (let i = 0; i < world.bodies.length; i++) {
+        considerProjectile(world.bodies[i]);
+      }
+    }
+  }
+
+  updateAmbientTension(dt, biomeState = null, simulationActive = true) {
+    const target = this.computeAmbientTensionTarget(biomeState);
+    if (simulationActive && dt > 0) {
+      const rate = target > this.ambientSustainedTension ? AUDIO_TENSION_RISE_RATE : AUDIO_TENSION_FALL_RATE;
+      this.ambientSustainedTension = moveTowardValue(this.ambientSustainedTension, target, rate * dt);
+      this.ambientImpulseTension = moveTowardValue(this.ambientImpulseTension, 0, AUDIO_TENSION_IMPULSE_DECAY_RATE * dt);
+    }
+    this.ambientTension = this.getEffectiveAmbientTension();
+    return this.ambientTension;
+  }
+
+  getEffectiveAmbientTension() {
+    return clamp((this.ambientSustainedTension ?? 0) + (this.ambientImpulseTension ?? 0), 0, 1);
+  }
+
+  getAmbientTensionDebugInfo() {
+    return {
+      current: this.ambientTension ?? 0,
+      sustained: this.ambientSustainedTension ?? 0,
+      target: this.ambientTargetTension ?? 0,
+      base: this.ambientBaseTension ?? 0,
+      conditions: this.ambientConditionTension ?? 0,
+      threat: this.ambientThreatTension ?? 0,
+      impulse: this.ambientImpulseTension ?? 0,
+      threats: this.ambientThreatSummary ?? [],
+      equilibriumSources: this.ambientEquilibriumSources ?? [],
+      impulseLog: this.ambientTensionImpulseLog ?? []
+    };
+  }
+
+  areAudioTagsEnabled(tags) {
+    if (!tags) {
+      return true;
+    }
+    for (const tag of tags) {
+      if (this.disabledAudioTags.has(tag)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  shouldAllowAudioEvent(event) {
+    return this.areAudioTagsEnabled(getAudioEventTags(event));
+  }
+
+  handleUserGesture() {
+    if (!this.engine.ensureStarted()) {
+      return false;
+    }
+    this.ambient.ensureStarted();
+    return true;
+  }
+
+  setRuntimeContext(world, player, proceduralField) {
+    this.world = world ?? this.world;
+    this.player = player ?? this.player;
+    this.proceduralField = proceduralField ?? this.proceduralField;
+  }
+
+  currentBiomeState(fallbackX = null, fallbackY = null) {
+    if (this.proceduralField?.getCurrentBiomeState) {
+      return this.proceduralField.getCurrentBiomeState();
+    }
+    const x = Number.isFinite(fallbackX) ? fallbackX : (this.player?.x ?? 0);
+    const y = Number.isFinite(fallbackY) ? fallbackY : (this.player?.y ?? 0);
+    return getBiomeStateAtWorld(x, y);
+  }
+
+  getBiomeProfileForEvent(event) {
+    if (event?.biomeState) {
+      return getBiomeAudioProfile(event.biomeState.id);
+    }
+    if (Number.isFinite(event?.x) && Number.isFinite(event?.y)) {
+      return getBiomeAudioProfile(getBiomeStateAtWorld(event.x, event.y).id);
+    }
+    return getBiomeAudioProfile(this.currentBiomeState().id);
+  }
+
+  getSpatialMix(event, customRange = null) {
+    const player = this.player;
+    if (!player || event?.isUi) {
+      return { gain: 1, pan: 0, distance: 0, distanceFactor: 1 };
+    }
+
+    const x = Number.isFinite(event?.x) ? event.x : event?.emitter?.x;
+    const y = Number.isFinite(event?.y) ? event.y : event?.emitter?.y;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return { gain: 1, pan: 0, distance: 0, distanceFactor: 1 };
+    }
+
+    const dx = x - player.x;
+    const dy = y - player.y;
+    const distance = Math.hypot(dx, dy);
+    const range = Math.max(180, customRange ?? AUDIO_EVENT_RANGE[event?.type] ?? 1600);
+    const distanceFactor = clamp(1 - distance / range, 0, 1);
+    return {
+      gain: Math.pow(distanceFactor, 1.25),
+      pan: clamp(dx / Math.max(180, range * 0.5), -1, 1),
+      distance,
+      distanceFactor
+    };
+  }
+
+  computeEventScore(event) {
+    const base = AUDIO_EVENT_IMPORTANCE[event.type] ?? 1.4;
+    const intensity = clamp(event.intensity ?? 1, 0.25, 8);
+    const spatial = this.getSpatialMix(event);
+    const priorityBoost = event.priority ?? 0;
+    const stackCount = Math.max(1, event.stackCount ?? 1);
+    let score = base * intensity * (event.isUi ? 1 : (0.15 + spatial.distanceFactor * 1.45)) + priorityBoost;
+    if (event.emitter === this.player || event.subject === this.player || event.target === this.player || event.counterpart === this.player) {
+      score += 2.4;
+    }
+    if (stackCount > 1) {
+      const stackWeight = event.type === "physicalCollision" || event.type === "asteroidBroken" || event.type === "projectileImpact" ? 0.72 : 0.44;
+      score += Math.min(1.6, Math.log2(stackCount) * stackWeight);
+    }
+    return score;
+  }
+
+  getEventVoiceCost(event) {
+    if (!event) {
+      return 1;
+    }
+    if (event.type === "coinCollected") {
+      return event.isBlueCoin ? 5 : 1;
+    }
+    return AUDIO_EVENT_VOICE_COST[event.type] ?? 1;
+  }
+
+  getEventFrameBudget(event) {
+    if (!event) {
+      return 1;
+    }
+    if (event.type === "shot" && event.emitter === this.player) {
+      return 4;
+    }
+    if (event.type === "projectileImpact" && event.target === this.player) {
+      return 4;
+    }
+    return AUDIO_EVENT_FRAME_BUDGET[event.type] ?? 1;
+  }
+
+  getActiveVoiceLoad() {
+    return this.activeVoiceUntil.length;
+  }
+
+  isProtectedEvent(event, score = null) {
+    if (!event) {
+      return false;
+    }
+    if (event.isUi) {
+      return true;
+    }
+    if (event.emitter === this.player || event.subject === this.player || event.target === this.player || event.counterpart === this.player) {
+      return true;
+    }
+    const resolvedScore = score ?? this.computeEventScore(event);
+    return event.type === "planetDestroyed" || event.type === "shipDestroyed" || resolvedScore >= 4.6;
+  }
+
+  getStackCellSize(event) {
+    if (!event) {
+      return 180;
+    }
+    if (event.type === "physicalCollision") {
+      const subjectKind = getEmitterAudioKind(event.subject);
+      const counterpartKind = getEmitterAudioKind(event.counterpart);
+      return subjectKind === "planet" || counterpartKind === "planet" ? 240 : 160;
+    }
+    if (event.type === "projectileImpact") {
+      return getEmitterAudioKind(event.target) === "planet" ? 180 : 120;
+    }
+    if (event.type === "asteroidBroken") {
+      return 160;
+    }
+    if (event.type === "shipDestroyed") {
+      return 200;
+    }
+    if (event.type === "asteroidAbsorbed") {
+      return 200;
+    }
+    if (event.type === "planetDestroyed") {
+      return 320;
+    }
+    if (event.type === "coinCollected") {
+      return 100;
+    }
+    if (event.type === "scrapDestroyed") {
+      return 120;
+    }
+    return 180;
+  }
+
+  getEventStackCellKey(event, cellSize = null) {
+    const x = Number.isFinite(event?.x) ? event.x : (event?.emitter?.x ?? event?.subject?.x ?? event?.target?.x ?? 0);
+    const y = Number.isFinite(event?.y) ? event.y : (event?.emitter?.y ?? event?.subject?.y ?? event?.target?.y ?? 0);
+    const safeCellSize = Math.max(40, cellSize ?? this.getStackCellSize(event));
+    return `${Math.floor(x / safeCellSize)}:${Math.floor(y / safeCellSize)}`;
+  }
+
+  getEventStackKey(event) {
+    if (!event || event.isUi) {
+      return null;
+    }
+
+    const type = event.type;
+    const faction = event.faction ?? event.emitter?.faction ?? "neutral";
+    const emitterKind = getEmitterAudioKind(event.emitter ?? event.subject);
+
+    if (type === "thruster" || type === "turn") {
+      return `${type}:${event.emitter?.id ?? "global"}`;
+    }
+
+    if (type === "shot") {
+      if (event.emitter === this.player) {
+        return `shot:player:${event.emitter?.id ?? 0}`;
+      }
+      if (event.emitter?.id != null) {
+        return `shot:${event.emitter.id}`;
+      }
+      return `shot:${faction}:${emitterKind}:${this.getEventStackCellKey(event, 240)}`;
+    }
+
+    if (type === "coinCollected") {
+      return `${type}:${event.emitter?.id ?? (event.isUi ? "ui" : "global")}:${event.isBlueCoin ? "blue" : "gold"}`;
+    }
+
+    if (type === "scrapCollected") {
+      return `${type}:${event.emitter?.id ?? "global"}`;
+    }
+
+    const cellKey = this.getEventStackCellKey(event);
+
+    if (type === "physicalCollision") {
+      const subjectKind = getEmitterAudioKind(event.subject);
+      const counterpartKind = getEmitterAudioKind(event.counterpart);
+      const pairKey = [subjectKind, counterpartKind].sort().join(">");
+      const perspectiveKey = subjectKind === counterpartKind ? subjectKind : `${subjectKind}->${counterpartKind}`;
+      return `${type}:${pairKey}:${perspectiveKey}:${cellKey}`;
+    }
+
+    if (type === "projectileImpact") {
+      return `${type}:${faction}:${getEmitterAudioKind(event.target)}:${cellKey}`;
+    }
+
+    if (type === "asteroidBroken") {
+      return `${type}:${event.terminal ? 1 : 0}:${cellKey}`;
+    }
+
+    if (type === "shipDestroyed") {
+      return `${type}:${faction}:${getEmitterAudioKind(event.subject)}:${cellKey}`;
+    }
+
+    if (type === "planetDestroyed") {
+      return `${type}:${cellKey}`;
+    }
+
+    if (type === "asteroidAbsorbed") {
+      return `${type}:${event.target?.id ?? cellKey}`;
+    }
+
+    if (type === "scrapDestroyed") {
+      return `${type}:${cellKey}`;
+    }
+
+    return `${type}:${cellKey}`;
+  }
+
+  preferStackEventCandidate(current, incoming) {
+    if (this.isProtectedEvent(incoming) && !this.isProtectedEvent(current)) {
+      return true;
+    }
+    const currentSpatial = this.getSpatialMix(current);
+    const incomingSpatial = this.getSpatialMix(incoming);
+    const currentWeight = (current.priority ?? 0) + currentSpatial.distanceFactor * 2 + (current.intensity ?? 1) * 0.5;
+    const incomingWeight = (incoming.priority ?? 0) + incomingSpatial.distanceFactor * 2 + (incoming.intensity ?? 1) * 0.5;
+    return incomingWeight > currentWeight;
+  }
+
+  combineEventIntensity(type, maxIntensity, totalIntensity, stackCount) {
+    const safeCount = Math.max(1, stackCount ?? 1);
+    const dominant = Math.max(0.25, maxIntensity ?? 1);
+    const total = Math.max(dominant, totalIntensity ?? dominant);
+    const combined = dominant + Math.log2(safeCount) * 0.32 + Math.max(0, total - dominant) * 0.12;
+    let cap = 6.4;
+
+    if (type === "planetDestroyed") {
+      cap = 9;
+    } else if (type === "shipDestroyed") {
+      cap = 7.8;
+    } else if (type === "coinCollected") {
+      cap = 4.5;
+    }
+
+    return clamp(combined, 0.25, cap);
+  }
+
+  mergeQueuedEvents(events) {
+    const merged = [];
+    const stackMap = new Map();
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const stackKey = this.getEventStackKey(event);
+      const initialCount = Math.max(1, event.stackCount ?? 1);
+      const initialIntensity = Math.max(0.25, event.intensity ?? 1);
+
+      if (!stackKey) {
+        merged.push({
+          ...event,
+          stackCount: initialCount,
+          intensity: initialIntensity,
+          intensityTotal: initialIntensity,
+          maxStackIntensity: initialIntensity
+        });
+        continue;
+      }
+
+      const existing = stackMap.get(stackKey);
+      if (!existing) {
+        const clone = {
+          ...event,
+          stackCount: initialCount,
+          intensity: initialIntensity,
+          intensityTotal: initialIntensity,
+          maxStackIntensity: initialIntensity
+        };
+        stackMap.set(stackKey, clone);
+        merged.push(clone);
+        continue;
+      }
+
+      existing.stackCount = Math.max(1, (existing.stackCount ?? 1) + initialCount);
+      existing.intensityTotal = (existing.intensityTotal ?? Math.max(0.25, existing.intensity ?? 1)) + initialIntensity;
+      existing.maxStackIntensity = Math.max(existing.maxStackIntensity ?? Math.max(0.25, existing.intensity ?? 1), initialIntensity);
+      existing.priority = Math.max(existing.priority ?? 0, event.priority ?? 0);
+      existing.terminal = !!(existing.terminal || event.terminal);
+      existing.isBlueCoin = !!(existing.isBlueCoin || event.isBlueCoin);
+      existing.isUi = !!(existing.isUi || event.isUi);
+      existing.fragmentCount = Math.max(existing.fragmentCount ?? 0, event.fragmentCount ?? 0);
+      existing.impactSpeed = Math.max(existing.impactSpeed ?? 0, event.impactSpeed ?? 0);
+      if (event.normal && !existing.normal) {
+        existing.normal = event.normal;
+      }
+
+      if (this.preferStackEventCandidate(existing, event)) {
+        const preserved = {
+          stackCount: existing.stackCount,
+          intensityTotal: existing.intensityTotal,
+          maxStackIntensity: existing.maxStackIntensity,
+          priority: existing.priority,
+          terminal: existing.terminal,
+          isBlueCoin: existing.isBlueCoin,
+          isUi: existing.isUi,
+          fragmentCount: existing.fragmentCount,
+          impactSpeed: existing.impactSpeed,
+          normal: existing.normal
+        };
+        Object.assign(existing, event);
+        existing.stackCount = preserved.stackCount;
+        existing.intensityTotal = preserved.intensityTotal;
+        existing.maxStackIntensity = preserved.maxStackIntensity;
+        existing.priority = preserved.priority;
+        existing.terminal = preserved.terminal;
+        existing.isBlueCoin = preserved.isBlueCoin;
+        existing.isUi = preserved.isUi;
+        existing.fragmentCount = preserved.fragmentCount;
+        existing.impactSpeed = preserved.impactSpeed;
+        existing.normal = preserved.normal;
+      }
+
+      existing.intensity = this.combineEventIntensity(existing.type, existing.maxStackIntensity, existing.intensityTotal, existing.stackCount);
+    }
+
+    return merged;
+  }
+
+  getEventStackCooldown(event, score = null) {
+    if (!event) {
+      return 0.06;
+    }
+
+    const stackCount = Math.max(1, event.stackCount ?? 1);
+    const resolvedScore = score ?? this.computeEventScore(event);
+
+    if (event.type === "shot") {
+      return event.emitter === this.player ? 0.04 : 0.06;
+    }
+    if (event.type === "projectileImpact") {
+      return getEmitterAudioKind(event.target) === "planet" ? 0.12 : 0.07;
+    }
+    if (event.type === "physicalCollision") {
+      const subjectKind = getEmitterAudioKind(event.subject);
+      const counterpartKind = getEmitterAudioKind(event.counterpart);
+      const involvesPlanet = subjectKind === "planet" || counterpartKind === "planet";
+      return involvesPlanet ? 0.18 : 0.1 + Math.min(0.08, (stackCount - 1) * 0.015);
+    }
+    if (event.type === "asteroidBroken") {
+      return event.terminal ? 0.12 : 0.08;
+    }
+    if (event.type === "asteroidAbsorbed") {
+      return 0.16;
+    }
+    if (event.type === "shipDestroyed") {
+      return 0.18;
+    }
+    if (event.type === "planetDestroyed") {
+      return 0.5;
+    }
+    if (event.type === "coinCollected") {
+      return event.isBlueCoin ? 0.1 : 0.05;
+    }
+    if (event.type === "scrapCollected") {
+      return 0.07;
+    }
+    if (event.type === "scrapDestroyed") {
+      return 0.08;
+    }
+    if (event.type === "thruster") {
+      return 0.02;
+    }
+    if (event.type === "turn") {
+      return 0.03;
+    }
+
+    return resolvedScore >= 4.6 ? 0.1 : 0.06;
+  }
+
+  compactQueue(events) {
+    const merged = this.mergeQueuedEvents(events);
+    if (merged.length === 0) {
+      return merged;
+    }
+
+    const compacted = [];
+    const now = this.getNowSeconds();
+
+    for (let i = 0; i < merged.length; i++) {
+      const event = merged[i];
+      const stackKey = this.getEventStackKey(event);
+      if (!stackKey) {
+        compacted.push(event);
+        continue;
+      }
+
+      const cooldownKey = `stack:${stackKey}`;
+      const score = this.computeEventScore(event);
+      const expiresAt = this.stackCooldowns.get(cooldownKey) ?? 0;
+      if (expiresAt > now) {
+        continue;
+      }
+
+      this.stackCooldowns.set(cooldownKey, now + this.getEventStackCooldown(event, score));
+      compacted.push(event);
+    }
+
+    return compacted;
+  }
+
+  pruneVoices(now = null) {
+    if (!this.engine.isReady()) {
+      this.activeVoiceUntil.length = 0;
+      return;
+    }
+    const currentTime = now ?? this.engine.context.currentTime;
+    this.activeVoiceUntil = this.activeVoiceUntil.filter((endTime) => endTime > currentTime);
+  }
+
+  registerVoice(endTime, voiceCost = 1) {
+    if (!(endTime > 0)) {
+      return;
+    }
+    const safeCost = Math.max(1, Math.round(voiceCost ?? 1));
+    for (let i = 0; i < safeCost; i++) {
+      this.activeVoiceUntil.push(endTime);
+    }
+  }
+
+  canPassCooldown(key, duration) {
+    const now = this.getNowSeconds();
+    const expiresAt = this.entityCooldowns.get(key) ?? 0;
+    if (expiresAt > now) {
+      return false;
+    }
+    this.entityCooldowns.set(key, now + Math.max(0.01, duration));
+    return true;
+  }
+
+  enqueue(type, payload = {}) {
+    const event = {
+      type,
+      intensity: 1,
+      ...payload
+    };
+    this.registerAmbientTensionEvent(event);
+    if (!this.shouldAllowAudioEvent(event)) {
+      return;
+    }
+    this.queue.push(event);
+  }
+
+  onShot(ship, options = {}) {
+    if (!ship || ship.isRemoved || !ship.isAlive) {
+      return;
+    }
+    this.enqueue("shot", {
+      emitter: ship,
+      subject: ship,
+      faction: ship.faction ?? "jugador",
+      x: ship.x,
+      y: ship.y,
+      intensity: clamp((ship.projectileDamage ?? 1) * 0.35 + (options.shotCount ?? ship.projectilesPerShot ?? 1) * 0.2 + (ship.hullClass === "large" ? 0.45 : 0), 0.8, 4.4)
+    });
+  }
+
+  onThruster(ship, ax, ay, dt) {
+    if (!ship || ship.isRemoved || !ship.isAlive || !(dt > 0)) {
+      return;
+    }
+
+    const accelMagnitude = Math.hypot(ax ?? 0, ay ?? 0);
+    const threshold = Math.max(36, (ship.maxAcceleration ?? ship.thrustPower ?? 120) * 0.12);
+    if (accelMagnitude < threshold) {
+      return;
+    }
+
+    const key = `${ship.id}:thruster`;
+    const interval = clamp(0.18 - accelMagnitude / Math.max(180, (ship.maxAcceleration ?? ship.thrustPower ?? 180) * 1.8) * 0.08, 0.06, 0.18);
+    if (!this.canPassCooldown(key, interval)) {
+      return;
+    }
+
+    this.enqueue("thruster", {
+      emitter: ship,
+      subject: ship,
+      faction: ship.faction ?? "jugador",
+      x: ship.x,
+      y: ship.y,
+      intensity: clamp(accelMagnitude / Math.max(80, ship.maxAcceleration ?? ship.thrustPower ?? 160), 0.35, 2.2)
+    });
+  }
+
+  onTurnDetected(ship, angularSpeed, angularAccel = 0) {
+    if (!ship || ship.isRemoved || !ship.isAlive) {
+      return;
+    }
+
+    const threshold = ship === this.player ? 0.4 : 0.7;
+    if (angularSpeed < threshold && angularAccel < 3.2) {
+      return;
+    }
+
+    const key = `${ship.id}:turn`;
+    const cooldown = clamp(0.22 - angularSpeed * 0.015, 0.08, 0.22);
+    if (!this.canPassCooldown(key, cooldown)) {
+      return;
+    }
+
+    this.enqueue("turn", {
+      emitter: ship,
+      subject: ship,
+      faction: ship.faction ?? "jugador",
+      x: ship.x,
+      y: ship.y,
+      intensity: clamp(angularSpeed * 0.55 + angularAccel * 0.08, 0.35, 2.1)
+    });
+  }
+
+  onProjectileImpact(projectile, target) {
+    if (!projectile || projectile.isRemoved) {
+      return;
+    }
+
+    const x = Number.isFinite(projectile.x) ? projectile.x : target?.x;
+    const y = Number.isFinite(projectile.y) ? projectile.y : target?.y;
+    this.enqueue("projectileImpact", {
+      emitter: projectile.owner ?? projectile,
+      projectile,
+      target,
+      faction: projectile.faction ?? projectile.owner?.faction ?? null,
+      x,
+      y,
+      intensity: clamp((projectile.damage ?? 1) * 0.5 + ((target?.radius ?? 8) / 24), 0.5, 3.8)
+    });
+  }
+
+  onShipDestroyed(ship) {
+    if (!ship) {
+      return;
+    }
+    this.enqueue("shipDestroyed", {
+      emitter: ship,
+      subject: ship,
+      faction: ship.faction ?? null,
+      x: ship.x,
+      y: ship.y,
+      intensity: clamp((ship.mass ?? 12) / 10 + (ship.hullClass === "large" ? 0.9 : 0), 1.1, 7.5)
+    });
+  }
+
+  onPhysicalCollision(a, b, impactSpeed, normal = null) {
+    if (!(impactSpeed > 12) || !a || !b) {
+      return;
+    }
+
+    const keyBase = a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;
+    if (!this.canPassCooldown(`collision:${keyBase}`, 0.08)) {
+      return;
+    }
+
+    this.enqueue("physicalCollision", {
+      emitter: a,
+      subject: a,
+      counterpart: b,
+      x: a.x,
+      y: a.y,
+      impactSpeed,
+      normal,
+      intensity: clamp(impactSpeed / 95 + (a.radius ?? 8) / 40, 0.35, 4.6)
+    });
+
+    this.enqueue("physicalCollision", {
+      emitter: b,
+      subject: b,
+      counterpart: a,
+      x: b.x,
+      y: b.y,
+      impactSpeed,
+      normal,
+      intensity: clamp(impactSpeed / 95 + (b.radius ?? 8) / 40, 0.35, 4.6)
+    });
+  }
+
+  onAsteroidBroken(asteroid, options = {}) {
+    if (!asteroid) {
+      return;
+    }
+    this.enqueue("asteroidBroken", {
+      emitter: asteroid,
+      subject: asteroid,
+      x: asteroid.x,
+      y: asteroid.y,
+      terminal: !!options.terminal,
+      intensity: clamp((asteroid.radius ?? 12) / 14 + ((options.fragmentCount ?? 0) > 1 ? 0.35 : 0), 0.6, 4.2)
+    });
+  }
+
+  onAsteroidAbsorbed(asteroid, planet) {
+    if (!asteroid || !planet) {
+      return;
+    }
+    this.enqueue("asteroidAbsorbed", {
+      emitter: planet,
+      subject: asteroid,
+      target: planet,
+      x: asteroid.x,
+      y: asteroid.y,
+      intensity: clamp((asteroid.radius ?? 12) / 14 + (planet.radius ?? 40) / 240, 0.9, 4.2)
+    });
+  }
+
+  onPlanetDestroyed(planetA, planetB, impactSpeed = 0) {
+    if (!planetA || !planetB) {
+      return;
+    }
+    this.enqueue("planetDestroyed", {
+      emitter: planetA,
+      subject: planetA,
+      target: planetB,
+      x: (planetA.x + planetB.x) * 0.5,
+      y: (planetA.y + planetB.y) * 0.5,
+      intensity: clamp((planetA.radius + planetB.radius) / 90 + impactSpeed / 120, 2.2, 8)
+    });
+  }
+
+  onCoinCollected(ship, coin, value = 1) {
+    if (!ship || !coin) {
+      return;
+    }
+    this.enqueue("coinCollected", {
+      emitter: ship,
+      subject: coin,
+      x: coin.x,
+      y: coin.y,
+      isBlueCoin: !!coin.isBlueCoin,
+      isUi: ship === this.player,
+      intensity: clamp((coin.isBlueCoin ? 2.2 : 0.9) + value * 0.02, 0.8, 4)
+    });
+  }
+
+  onScrapCollected(ship, scrap) {
+    if (!ship || !scrap) {
+      return;
+    }
+    this.enqueue("scrapCollected", {
+      emitter: ship,
+      subject: scrap,
+      x: scrap.x,
+      y: scrap.y,
+      intensity: clamp((scrap.radius ?? 6) / 8, 0.6, 2.2)
+    });
+  }
+
+  onScrapDestroyed(scrap) {
+    if (!scrap) {
+      return;
+    }
+    this.enqueue("scrapDestroyed", {
+      emitter: scrap,
+      subject: scrap,
+      x: scrap.x,
+      y: scrap.y,
+      intensity: clamp((scrap.radius ?? 6) / 7, 0.6, 2.4)
+    });
+  }
+
+  onMenuOpen(menuType = "menu") {
+    this.enqueue("menuOpen", {
+      isUi: true,
+      menuType,
+      intensity: 1
+    });
+  }
+
+  onMenuClose(menuType = "menu") {
+    this.enqueue("menuClose", {
+      isUi: true,
+      menuType,
+      intensity: 0.92
+    });
+  }
+
+  onPurchase(entry = null) {
+    this.enqueue("purchase", {
+      isUi: true,
+      entry,
+      intensity: clamp(((entry?.cost ?? 0) / 40) + 1, 1, 4)
+    });
+  }
+
+  onUiError(reason = "error") {
+    if (!this.canPassCooldown(`uiError:${reason}`, 0.14)) {
+      return;
+    }
+    this.enqueue("uiError", {
+      isUi: true,
+      reason,
+      intensity: 1
+    });
+  }
+
+  onInterceptorLaunch(carrier, interceptor) {
+    if (!carrier) {
+      return;
+    }
+    this.enqueue("interceptorLaunch", {
+      emitter: carrier,
+      subject: interceptor ?? carrier,
+      faction: carrier.faction ?? "Portanaves",
+      x: carrier.x,
+      y: carrier.y,
+      intensity: clamp((carrier.radius ?? 26) / 22, 1, 3.4)
+    });
+  }
+
+  captureMotionEvents(dt, suppressEmit = false) {
+    const world = this.world;
+    const player = this.player;
+    if (!world || !player || !(dt > 0)) {
+      return;
+    }
+
+    const playerRangeSq = 1400 * 1400;
+    const nextState = new Map();
+
+    for (let i = 0; i < world.bodies.length; i++) {
+      const body = world.bodies[i];
+      if (!body || body.isRemoved || !isShipLike(body) || body.isAlive === false) {
+        continue;
+      }
+
+      const dx = body.x - player.x;
+      const dy = body.y - player.y;
+      if (body !== player && dx * dx + dy * dy > playerRangeSq) {
+        continue;
+      }
+
+      const previous = this.bodyMotionState.get(body.id);
+      let angularSpeed = 0;
+      if (previous) {
+        angularSpeed = Math.abs(wrapAngle(body.angle - previous.angle)) / Math.max(1e-4, dt);
+        const angularAccel = Math.abs(angularSpeed - previous.angularSpeed) / Math.max(1e-4, dt);
+        if (!suppressEmit) {
+          this.onTurnDetected(body, angularSpeed, angularAccel);
+        }
+      }
+
+      nextState.set(body.id, {
+        angle: body.angle,
+        angularSpeed
+      });
+    }
+
+    this.bodyMotionState = nextState;
+  }
+
+  cleanupMotionState() {
+    const now = this.getNowSeconds();
+    if (now - this.lastMotionCleanupAt < 0.5) {
+      return;
+    }
+    this.lastMotionCleanupAt = now;
+
+    for (const [key, expiresAt] of this.entityCooldowns.entries()) {
+      if (expiresAt <= now) {
+        this.entityCooldowns.delete(key);
+      }
+    }
+
+    for (const [key, expiresAt] of this.stackCooldowns.entries()) {
+      if (expiresAt <= now) {
+        this.stackCooldowns.delete(key);
+      }
+    }
+
+    if (this.projectileNearTensionIds.size > 0 || this.projectileVeryNearTensionIds.size > 0) {
+      const activeProjectileIds = new Set();
+      const bodies = this.world?.bodies;
+      if (Array.isArray(bodies)) {
+        for (let i = 0; i < bodies.length; i++) {
+          const body = bodies[i];
+          if (body && !body.isRemoved && body.kind === "projectile") {
+            activeProjectileIds.add(body.id);
+          }
+        }
+      }
+
+      for (const projectileId of this.projectileNearTensionIds) {
+        if (!activeProjectileIds.has(projectileId)) {
+          this.projectileNearTensionIds.delete(projectileId);
+        }
+      }
+      for (const projectileId of this.projectileVeryNearTensionIds) {
+        if (!activeProjectileIds.has(projectileId)) {
+          this.projectileVeryNearTensionIds.delete(projectileId);
+        }
+      }
+    }
+  }
+
+  buildBiomeUiNotes(pattern = "menu") {
+    const biomeProfile = getBiomeAudioProfile(this.currentBiomeState().id);
+    const root = biomeProfile.uiRootMidi;
+    const intervals = biomeProfile.uiIntervals ?? [0, 7, 12];
+
+    if (pattern === "purchase") {
+      return [root + intervals[0], root + intervals[1], root + intervals[2], root + intervals[1]];
+    }
+    if (pattern === "close") {
+      return [root + intervals[1], root + intervals[0]];
+    }
+    if (pattern === "error") {
+      return [root + 1, root - 5];
+    }
+    if (pattern === "blueCoin") {
+      return [root + intervals[0], root + intervals[1], root + intervals[2], root + intervals[2] + 5];
+    }
+    if (pattern === "coin") {
+      return [root + intervals[1]];
+    }
+    return [root + intervals[0], root + intervals[2]];
+  }
+
+  renderShot(event, spatial, factionProfile) {
+    const emitterKind = getEmitterAudioKind(event.emitter);
+    const noteMidi = this.harmony.pickNote(event.faction, { eventType: "shot", emitterKind });
+    const frequency = midiToFrequency(noteMidi);
+    const brightness = factionProfile.brightness ?? 1;
+    const duration = clamp(0.08 + event.intensity * 0.016, 0.08, 0.18);
+    const endA = this.engine.playOscillator({
+      category: "faction",
+      wave: factionProfile.toneWave,
+      frequency,
+      startFrequency: frequency * (1.28 + (factionProfile.flutter ?? 0)),
+      endFrequency: frequency,
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.05 * brightness * spatial.gain,
+      attack: 0.002,
+      decay: 0.04,
+      sustainLevel: 0.18,
+      release: 0.04,
+      filterType: "bandpass",
+      filterFrequency: Math.max(120, factionProfile.shotFilter * brightness),
+      filterQ: 1.2 + event.intensity * 0.12,
+      distortion: factionProfile.distortion ?? 0
+    });
+    const endB = this.engine.playNoiseBurst({
+      category: "faction",
+      duration: duration * 0.78,
+      pan: spatial.pan,
+      peakGain: 0.038 * (factionProfile.shotNoiseMix ?? 0.2) * event.intensity * spatial.gain,
+      attack: 0.001,
+      decay: 0.03,
+      sustainLevel: 0.12,
+      release: 0.03,
+      filterType: "bandpass",
+      filterFrequency: Math.max(180, factionProfile.shotNoiseFilter * brightness),
+      filterQ: 1.4,
+      distortion: Math.max(0, (factionProfile.distortion ?? 0) * 0.7)
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderThruster(event, spatial, factionProfile) {
+    const emitterKind = getEmitterAudioKind(event.emitter);
+    const noteMidi = this.harmony.pickNote(event.faction, { eventType: "thruster", emitterKind });
+    const frequency = midiToFrequency(noteMidi);
+    const duration = clamp(0.09 + event.intensity * 0.04, 0.09, 0.22);
+    const endA = this.engine.playNoiseBurst({
+      category: "faction",
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.026 * event.intensity * spatial.gain,
+      attack: 0.002,
+      decay: duration * 0.45,
+      sustainLevel: 0.1,
+      release: duration * 0.3,
+      filterType: "bandpass",
+      filterFrequency: Math.max(120, factionProfile.thrusterFilter * (0.85 + event.intensity * 0.08)),
+      filterQ: 0.9 + event.intensity * 0.22,
+      distortion: Math.max(0, (factionProfile.distortion ?? 0) * 0.65)
+    });
+    const endB = this.engine.playOscillator({
+      category: "faction",
+      wave: factionProfile.accentWave,
+      frequency,
+      startFrequency: frequency * 0.92,
+      endFrequency: frequency * 0.74,
+      duration: duration * 0.92,
+      pan: spatial.pan,
+      peakGain: 0.02 * spatial.gain,
+      attack: 0.006,
+      decay: duration * 0.4,
+      sustainLevel: 0.14,
+      release: duration * 0.34,
+      filterType: "lowpass",
+      filterFrequency: Math.max(80, factionProfile.thrusterFilter * 0.72),
+      filterQ: 0.5,
+      distortion: Math.max(0, (factionProfile.distortion ?? 0) * 0.45)
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderTurn(event, spatial, factionProfile) {
+    const emitterKind = getEmitterAudioKind(event.emitter);
+    const noteMidi = this.harmony.pickNote(event.faction, { eventType: "turn", emitterKind });
+    const frequency = midiToFrequency(noteMidi);
+    return this.engine.playOscillator({
+      category: "faction",
+      wave: factionProfile.accentWave,
+      frequency,
+      startFrequency: frequency * 1.08,
+      endFrequency: frequency * 0.96,
+      duration: clamp(0.06 + event.intensity * 0.025, 0.06, 0.14),
+      pan: spatial.pan,
+      peakGain: 0.018 * spatial.gain,
+      attack: 0.002,
+      decay: 0.04,
+      sustainLevel: 0.18,
+      release: 0.03,
+      filterType: "bandpass",
+      filterFrequency: Math.max(220, factionProfile.turnFilter),
+      filterQ: 1.8,
+      distortion: Math.max(0, (factionProfile.distortion ?? 0) * 0.3)
+    });
+  }
+
+  resolveImpactTonality(event, factionProfile) {
+    const target = event.target;
+    if (event.faction) {
+      return {
+        frequency: midiToFrequency(this.harmony.pickNote(event.faction, { eventType: "impact", emitterKind: getEmitterAudioKind(target) })),
+        filterFrequency: Math.max(180, factionProfile.impactFilter)
+      };
+    }
+
+    const biomeProfile = this.getBiomeProfileForEvent(event);
+    return {
+      frequency: midiToFrequency((biomeProfile.uiRootMidi ?? 60) - 12),
+      filterFrequency: biomeProfile.physicsFilter
+    };
+  }
+
+  renderProjectileImpact(event, spatial, factionProfile) {
+    const tonality = this.resolveImpactTonality(event, factionProfile);
+    const targetKind = getEmitterAudioKind(event.target);
+    const impactSharpness = targetKind === "planet" ? 0.55 : targetKind === "scrap" ? 1.35 : 1;
+    const duration = clamp(0.06 + event.intensity * 0.025, 0.06, 0.18);
+    const endA = this.engine.playNoiseBurst({
+      category: event.target?.kind === "planet" ? "physics" : "faction",
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.032 * event.intensity * spatial.gain,
+      attack: 0.001,
+      decay: duration * 0.36,
+      sustainLevel: 0.1,
+      release: duration * 0.3,
+      filterType: "bandpass",
+      filterFrequency: Math.max(140, tonality.filterFrequency * impactSharpness),
+      filterQ: targetKind === "scrap" ? 2.3 : 1.4,
+      distortion: targetKind === "tarantula" ? 0.16 : 0.08
+    });
+    const endB = this.engine.playOscillator({
+      category: event.target?.kind === "planet" ? "physics" : "faction",
+      wave: targetKind === "scrap" ? "square" : "triangle",
+      frequency: tonality.frequency,
+      startFrequency: tonality.frequency * 1.18,
+      endFrequency: tonality.frequency * (targetKind === "planet" ? 0.68 : 0.88),
+      duration: duration * 0.92,
+      pan: spatial.pan,
+      peakGain: 0.016 * spatial.gain,
+      attack: 0.001,
+      decay: duration * 0.32,
+      sustainLevel: 0.12,
+      release: duration * 0.3,
+      filterType: "bandpass",
+      filterFrequency: Math.max(120, tonality.filterFrequency),
+      filterQ: targetKind === "planet" ? 0.9 : 1.5,
+      distortion: targetKind === "planet" ? 0.12 : 0.06
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderShipDestroyed(event, spatial, factionProfile) {
+    const kind = getEmitterAudioKind(event.subject);
+    const noteMidi = this.harmony.pickNote(event.faction ?? "jugador", { eventType: "destruction", emitterKind: kind });
+    const frequency = midiToFrequency(noteMidi);
+    const duration = clamp(0.32 + event.intensity * 0.08, 0.32, 0.95);
+    const endA = this.engine.playNoiseBurst({
+      category: "faction",
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.055 * event.intensity * spatial.gain,
+      attack: 0.002,
+      decay: duration * 0.45,
+      sustainLevel: 0.12,
+      release: duration * 0.36,
+      filterType: "bandpass",
+      filterFrequency: Math.max(120, factionProfile.impactFilter * 0.78),
+      filterQ: 1.05,
+      distortion: Math.max(0.08, factionProfile.distortion ?? 0)
+    });
+    const endB = this.engine.playOscillator({
+      category: "faction",
+      wave: kind === "carrier" || kind === "tarantula" ? "sawtooth" : factionProfile.toneWave,
+      frequency,
+      startFrequency: frequency * 0.72,
+      endFrequency: frequency * 0.35,
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.028 * event.intensity * spatial.gain,
+      attack: 0.004,
+      decay: duration * 0.4,
+      sustainLevel: 0.12,
+      release: duration * 0.4,
+      filterType: "lowpass",
+      filterFrequency: Math.max(80, factionProfile.impactFilter * 0.65),
+      filterQ: 0.7,
+      distortion: Math.max(0.08, factionProfile.distortion ?? 0)
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderCollision(event, spatial, biomeProfile) {
+    const subject = event.subject;
+    const profile = getBodyCollisionAudioBase(subject);
+    const bodyKind = getEmitterAudioKind(subject);
+    const subjectRadius = Math.max(4, subject?.radius ?? 8);
+    const frequencyBase = bodyKind === "planet"
+      ? midiToFrequency((biomeProfile.ambientRootMidi ?? 34) - 12)
+      : Math.max(50, profile.baseFilter * (12 / subjectRadius));
+    const duration = clamp(profile.duration + event.intensity * 0.02, profile.duration, profile.duration * 1.6);
+    const endA = this.engine.playNoiseBurst({
+      category: "physics",
+      duration,
+      pan: spatial.pan,
+      peakGain: profile.noiseGain * event.intensity * spatial.gain,
+      attack: 0.001,
+      decay: duration * 0.35,
+      sustainLevel: 0.1,
+      release: duration * 0.4,
+      filterType: "bandpass",
+      filterFrequency: Math.max(90, biomeProfile.physicsFilter * 0.6 + profile.baseFilter * 0.4),
+      filterQ: biomeProfile.physicsResonance * 0.62,
+      distortion: bodyKind === "scrap" || bodyKind === "tarantula" ? 0.16 : 0.08
+    });
+    const endB = this.engine.playOscillator({
+      category: "physics",
+      wave: profile.wave,
+      frequency: frequencyBase,
+      startFrequency: Math.max(30, frequencyBase * 1.15),
+      endFrequency: Math.max(24, frequencyBase * 0.7),
+      duration: duration * 0.94,
+      pan: spatial.pan,
+      peakGain: profile.baseGain * spatial.gain,
+      attack: 0.001,
+      decay: duration * 0.3,
+      sustainLevel: 0.1,
+      release: duration * 0.35,
+      filterType: "bandpass",
+      filterFrequency: Math.max(90, biomeProfile.physicsFilter * 0.55 + profile.baseFilter * 0.45),
+      filterQ: bodyKind === "coin" || bodyKind === "blueCoin" ? 3.4 : 1.2,
+      distortion: bodyKind === "planet" ? 0.2 : 0.08
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderAsteroidBroken(event, spatial, biomeProfile) {
+    const duration = event.terminal ? 0.22 : 0.16;
+    const endA = this.engine.playNoiseBurst({
+      category: "physics",
+      duration: duration + event.intensity * 0.04,
+      pan: spatial.pan,
+      peakGain: 0.04 * event.intensity * spatial.gain,
+      attack: 0.001,
+      decay: 0.08,
+      sustainLevel: 0.08,
+      release: 0.08,
+      filterType: "bandpass",
+      filterFrequency: Math.max(100, biomeProfile.physicsFilter * 0.58),
+      filterQ: biomeProfile.physicsResonance * 0.72,
+      distortion: 0.1
+    });
+    const endB = this.engine.playOscillator({
+      category: "physics",
+      wave: "triangle",
+      frequency: Math.max(44, midiToFrequency((biomeProfile.ambientRootMidi ?? 36) - 5)),
+      startFrequency: Math.max(44, midiToFrequency((biomeProfile.ambientRootMidi ?? 36) - 2)),
+      endFrequency: Math.max(34, midiToFrequency((biomeProfile.ambientRootMidi ?? 36) - 12)),
+      duration: duration + event.intensity * 0.05,
+      pan: spatial.pan,
+      peakGain: 0.016 * spatial.gain,
+      attack: 0.002,
+      decay: 0.08,
+      sustainLevel: 0.1,
+      release: 0.1,
+      filterType: "lowpass",
+      filterFrequency: Math.max(100, biomeProfile.physicsFilter * 0.48),
+      filterQ: 0.7,
+      distortion: 0.08
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderAsteroidAbsorbed(event, spatial, biomeProfile) {
+    const root = midiToFrequency((biomeProfile.ambientRootMidi ?? 36) - 12);
+    const endA = this.engine.playNoiseBurst({
+      category: "physics",
+      duration: 0.42,
+      pan: spatial.pan,
+      peakGain: 0.03 * event.intensity * spatial.gain,
+      attack: 0.02,
+      decay: 0.12,
+      sustainLevel: 0.16,
+      release: 0.18,
+      filterType: "bandpass",
+      filterFrequency: Math.max(80, biomeProfile.physicsFilter * 0.42),
+      filterQ: biomeProfile.physicsResonance * 0.85,
+      distortion: 0.14
+    });
+    const endB = this.engine.playOscillator({
+      category: "physics",
+      wave: "sine",
+      frequency: root,
+      startFrequency: root * 1.2,
+      endFrequency: root * 0.66,
+      duration: 0.46,
+      pan: spatial.pan,
+      peakGain: 0.02 * spatial.gain,
+      attack: 0.01,
+      decay: 0.16,
+      sustainLevel: 0.18,
+      release: 0.18,
+      filterType: "lowpass",
+      filterFrequency: Math.max(70, biomeProfile.physicsFilter * 0.36),
+      filterQ: 0.8,
+      distortion: 0.08
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderPlanetDestroyed(event, spatial, biomeProfile) {
+    const root = midiToFrequency((biomeProfile.ambientRootMidi ?? 36) - 17);
+    const duration = clamp(0.7 + event.intensity * 0.08, 0.7, 1.25);
+    const endA = this.engine.playNoiseBurst({
+      category: "physics",
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.08 * event.intensity * spatial.gain,
+      attack: 0.01,
+      decay: duration * 0.4,
+      sustainLevel: 0.15,
+      release: duration * 0.35,
+      filterType: "bandpass",
+      filterFrequency: Math.max(70, biomeProfile.physicsFilter * 0.32),
+      filterQ: biomeProfile.physicsResonance,
+      distortion: 0.28
+    });
+    const endB = this.engine.playOscillator({
+      category: "physics",
+      wave: "sawtooth",
+      frequency: root,
+      startFrequency: root * 1.25,
+      endFrequency: root * 0.42,
+      duration,
+      pan: spatial.pan,
+      peakGain: 0.024 * event.intensity * spatial.gain,
+      attack: 0.01,
+      decay: duration * 0.35,
+      sustainLevel: 0.16,
+      release: duration * 0.35,
+      filterType: "lowpass",
+      filterFrequency: Math.max(70, biomeProfile.physicsFilter * 0.28),
+      filterQ: 0.65,
+      distortion: 0.24
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderCoinCollected(event, spatial) {
+    const notes = this.buildBiomeUiNotes(event.isBlueCoin ? "blueCoin" : "coin");
+    let latestEnd = 0;
+    const step = event.isBlueCoin ? 0.045 : 0;
+    const now = this.engine.context.currentTime;
+    const gainScale = event.isUi ? 1 : spatial.gain;
+    const pan = event.isUi ? 0 : spatial.pan;
+    const category = event.isUi ? "ui" : "physics";
+    for (let i = 0; i < notes.length; i++) {
+      const note = notes[i];
+      const start = now + i * step;
+      const frequency = midiToFrequency(note);
+      latestEnd = Math.max(latestEnd, this.engine.playOscillator({
+        category,
+        wave: event.isBlueCoin ? "triangle" : "sine",
+        frequency,
+        startFrequency: frequency * 1.06,
+        endFrequency: frequency,
+        startTime: start,
+        duration: event.isBlueCoin ? 0.18 : 0.12,
+        pan,
+        peakGain: (event.isBlueCoin ? 0.038 : 0.024) * clamp(event.intensity, 0.8, 2.5) * gainScale,
+        attack: 0.002,
+        decay: 0.05,
+        sustainLevel: 0.15,
+        release: 0.06,
+        filterType: "bandpass",
+        filterFrequency: event.isBlueCoin ? 2600 : 2200,
+        filterQ: event.isBlueCoin ? 2.2 : 1.6
+      }));
+    }
+    if (event.isBlueCoin) {
+      latestEnd = Math.max(latestEnd, this.engine.playNoiseBurst({
+        category,
+        startTime: now,
+        duration: 0.2,
+        pan,
+        peakGain: 0.018 * clamp(event.intensity, 0.8, 2.5) * gainScale,
+        attack: 0.001,
+        decay: 0.06,
+        sustainLevel: 0.1,
+        release: 0.07,
+        filterType: "bandpass",
+        filterFrequency: 3000,
+        filterQ: 2.8
+      }));
+    }
+    return latestEnd;
+  }
+
+  renderScrapCollected(event, spatial) {
+    const endA = this.engine.playNoiseBurst({
+      category: "physics",
+      duration: 0.12,
+      pan: spatial.pan,
+      peakGain: 0.018 * spatial.gain,
+      attack: 0.001,
+      decay: 0.04,
+      sustainLevel: 0.08,
+      release: 0.04,
+      filterType: "bandpass",
+      filterFrequency: 1700,
+      filterQ: 2.2,
+      distortion: 0.1
+    });
+    const endB = this.engine.playOscillator({
+      category: "physics",
+      wave: "square",
+      frequency: 220,
+      startFrequency: 260,
+      endFrequency: 180,
+      duration: 0.12,
+      pan: spatial.pan,
+      peakGain: 0.014 * spatial.gain,
+      attack: 0.001,
+      decay: 0.04,
+      sustainLevel: 0.08,
+      release: 0.05,
+      filterType: "bandpass",
+      filterFrequency: 1100,
+      filterQ: 1.6
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderScrapDestroyed(event, spatial) {
+    return this.engine.playNoiseBurst({
+      category: "physics",
+      duration: 0.16,
+      pan: spatial.pan,
+      peakGain: 0.02 * event.intensity * spatial.gain,
+      attack: 0.001,
+      decay: 0.05,
+      sustainLevel: 0.08,
+      release: 0.06,
+      filterType: "bandpass",
+      filterFrequency: 1450,
+      filterQ: 2.1,
+      distortion: 0.14
+    });
+  }
+
+  renderMenuOpen() {
+    const notes = this.buildBiomeUiNotes("menu");
+    let latestEnd = 0;
+    const now = this.engine.context.currentTime;
+    for (let i = 0; i < notes.length; i++) {
+      const freq = midiToFrequency(notes[i]);
+      latestEnd = Math.max(latestEnd, this.engine.playOscillator({
+        category: "ui",
+        wave: "triangle",
+        frequency: freq,
+        startFrequency: freq * 0.96,
+        endFrequency: freq,
+        startTime: now + i * 0.03,
+        duration: 0.14,
+        pan: 0,
+        peakGain: 0.02,
+        attack: 0.003,
+        decay: 0.05,
+        sustainLevel: 0.15,
+        release: 0.05,
+        filterType: "bandpass",
+        filterFrequency: 2200,
+        filterQ: 1.4
+      }));
+    }
+    return latestEnd;
+  }
+
+  renderMenuClose() {
+    const notes = this.buildBiomeUiNotes("close");
+    let latestEnd = 0;
+    const now = this.engine.context.currentTime;
+    for (let i = 0; i < notes.length; i++) {
+      const freq = midiToFrequency(notes[i]);
+      latestEnd = Math.max(latestEnd, this.engine.playOscillator({
+        category: "ui",
+        wave: "triangle",
+        frequency: freq,
+        startFrequency: freq * 1.04,
+        endFrequency: freq * 0.94,
+        startTime: now + i * 0.02,
+        duration: 0.12,
+        pan: 0,
+        peakGain: 0.017,
+        attack: 0.002,
+        decay: 0.04,
+        sustainLevel: 0.1,
+        release: 0.04,
+        filterType: "bandpass",
+        filterFrequency: 1800,
+        filterQ: 1.2
+      }));
+    }
+    return latestEnd;
+  }
+
+  renderPurchase(event) {
+    const notes = this.buildBiomeUiNotes("purchase");
+    let latestEnd = 0;
+    const now = this.engine.context.currentTime;
+    for (let i = 0; i < notes.length; i++) {
+      const freq = midiToFrequency(notes[i]);
+      latestEnd = Math.max(latestEnd, this.engine.playOscillator({
+        category: "ui",
+        wave: i % 2 === 0 ? "triangle" : "sine",
+        frequency: freq,
+        startFrequency: freq * 0.98,
+        endFrequency: freq,
+        startTime: now + i * 0.035,
+        duration: 0.18,
+        pan: 0,
+        peakGain: 0.02 + clamp(event.intensity - 1, 0, 3) * 0.003,
+        attack: 0.002,
+        decay: 0.06,
+        sustainLevel: 0.16,
+        release: 0.06,
+        filterType: "bandpass",
+        filterFrequency: 2000 + i * 180,
+        filterQ: 1.5
+      }));
+    }
+    return latestEnd;
+  }
+
+  renderUiError() {
+    const notes = this.buildBiomeUiNotes("error");
+    let latestEnd = 0;
+    const now = this.engine.context.currentTime;
+    for (let i = 0; i < notes.length; i++) {
+      const freq = midiToFrequency(notes[i]);
+      latestEnd = Math.max(latestEnd, this.engine.playOscillator({
+        category: "ui",
+        wave: "square",
+        frequency: freq,
+        startFrequency: freq * 1.03,
+        endFrequency: freq * 0.9,
+        startTime: now + i * 0.05,
+        duration: 0.13,
+        pan: 0,
+        peakGain: 0.02,
+        attack: 0.001,
+        decay: 0.04,
+        sustainLevel: 0.1,
+        release: 0.05,
+        filterType: "bandpass",
+        filterFrequency: 1300,
+        filterQ: 2.1,
+        distortion: 0.08
+      }));
+    }
+    return latestEnd;
+  }
+
+  renderInterceptorLaunch(event, spatial, factionProfile) {
+    const noteMidi = this.harmony.pickNote(event.faction ?? "Portanaves", { eventType: "shot", emitterKind: "interceptor", register: "high" });
+    const frequency = midiToFrequency(noteMidi);
+    const endA = this.engine.playOscillator({
+      category: "faction",
+      wave: "square",
+      frequency,
+      startFrequency: frequency * 1.2,
+      endFrequency: frequency,
+      duration: 0.16,
+      pan: spatial.pan,
+      peakGain: 0.028 * spatial.gain,
+      attack: 0.002,
+      decay: 0.05,
+      sustainLevel: 0.12,
+      release: 0.06,
+      filterType: "bandpass",
+      filterFrequency: Math.max(1600, factionProfile.shotFilter * 0.85),
+      filterQ: 1.6,
+      distortion: 0.08
+    });
+    const endB = this.engine.playNoiseBurst({
+      category: "faction",
+      duration: 0.12,
+      pan: spatial.pan,
+      peakGain: 0.016 * spatial.gain,
+      attack: 0.001,
+      decay: 0.03,
+      sustainLevel: 0.08,
+      release: 0.04,
+      filterType: "bandpass",
+      filterFrequency: 2600,
+      filterQ: 1.8,
+      distortion: 0.08
+    });
+    return Math.max(endA, endB);
+  }
+
+  renderEvent(event) {
+    const spatial = this.getSpatialMix(event);
+    const factionProfile = getFactionAudioProfile(event.faction ?? event.emitter?.faction ?? "jugador");
+    const biomeProfile = this.getBiomeProfileForEvent(event);
+
+    if (event.type === "shot") {
+      return this.renderShot(event, spatial, factionProfile);
+    }
+    if (event.type === "thruster") {
+      return this.renderThruster(event, spatial, factionProfile);
+    }
+    if (event.type === "turn") {
+      return this.renderTurn(event, spatial, factionProfile);
+    }
+    if (event.type === "projectileImpact") {
+      return this.renderProjectileImpact(event, spatial, factionProfile);
+    }
+    if (event.type === "shipDestroyed") {
+      return this.renderShipDestroyed(event, spatial, factionProfile);
+    }
+    if (event.type === "physicalCollision") {
+      return this.renderCollision(event, spatial, biomeProfile);
+    }
+    if (event.type === "asteroidBroken") {
+      return this.renderAsteroidBroken(event, spatial, biomeProfile);
+    }
+    if (event.type === "asteroidAbsorbed") {
+      return this.renderAsteroidAbsorbed(event, spatial, biomeProfile);
+    }
+    if (event.type === "planetDestroyed") {
+      return this.renderPlanetDestroyed(event, spatial, biomeProfile);
+    }
+    if (event.type === "coinCollected") {
+      return this.renderCoinCollected(event, spatial);
+    }
+    if (event.type === "scrapCollected") {
+      return this.renderScrapCollected(event, spatial);
+    }
+    if (event.type === "scrapDestroyed") {
+      return this.renderScrapDestroyed(event, spatial);
+    }
+    if (event.type === "menuOpen") {
+      return this.renderMenuOpen();
+    }
+    if (event.type === "menuClose") {
+      return this.renderMenuClose();
+    }
+    if (event.type === "purchase") {
+      return this.renderPurchase(event);
+    }
+    if (event.type === "uiError") {
+      return this.renderUiError();
+    }
+    if (event.type === "interceptorLaunch") {
+      return this.renderInterceptorLaunch(event, spatial, factionProfile);
+    }
+    return 0;
+  }
+
+  flushQueue() {
+    if (!this.engine.isReady() || this.queue.length === 0) {
+      this.queue.length = 0;
+      return;
+    }
+
+    this.pruneVoices();
+    const compactedQueue = this.compactQueue(this.queue);
+    this.queue.length = 0;
+    const queued = compactedQueue.map((event) => ({
+      event,
+      score: this.computeEventScore(event),
+      voiceCost: this.getEventVoiceCost(event)
+    }));
+    queued.sort((a, b) => b.score - a.score);
+
+    let processed = 0;
+    let activeVoiceLoad = this.getActiveVoiceLoad();
+    const processedByType = new Map();
+
+    for (let i = 0; i < queued.length; i++) {
+      const item = queued[i];
+      if (processed >= this.maxEventsPerFrame) {
+        break;
+      }
+
+      if (!(item.score > 0.2)) {
+        continue;
+      }
+
+      const alreadyProcessedOfType = processedByType.get(item.event.type) ?? 0;
+      if (alreadyProcessedOfType >= this.getEventFrameBudget(item.event)) {
+        continue;
+      }
+
+      const protectedEvent = this.isProtectedEvent(item.event, item.score);
+      const maxAllowedLoad = protectedEvent ? this.maxVoiceLoad + this.criticalVoiceReserve : this.maxVoiceLoad;
+      if (activeVoiceLoad + item.voiceCost > maxAllowedLoad) {
+        continue;
+      }
+
+      const endTime = this.renderEvent(item.event);
+      if (endTime > 0) {
+        this.registerVoice(endTime, item.voiceCost);
+        activeVoiceLoad += item.voiceCost;
+        processedByType.set(item.event.type, alreadyProcessedOfType + 1);
+        processed++;
+      }
+    }
+  }
+
+  update(dt, options = {}) {
+    this.setRuntimeContext(options.world, options.player, options.proceduralField);
+    const simulationActive = options.simulationActive ?? true;
+    const biomeState = options.biomeState ?? this.currentBiomeState();
+    if (simulationActive) {
+      this.captureProjectileNearMissTension();
+    }
+    this.updateAmbientTension(dt, biomeState, simulationActive);
+    this.harmony.update(dt, simulationActive);
+    this.biomeHarmony.update(dt, simulationActive, this.ambientTension);
+
+    if (!this.engine.isReady()) {
+      this.captureMotionEvents(dt, true);
+      this.queue.length = 0;
+      this.cleanupMotionState();
+      return;
+    }
+
+    if (this.isAudioTagEnabled("category:ambient")) {
+      this.pruneVoices();
+      const biomeProfile = getBiomeAudioProfile(biomeState.id);
+      const biomeHarmony = this.biomeHarmony.getCurrentHarmony(biomeState.id);
+      const ambientDucking = clamp(this.getActiveVoiceLoad() / Math.max(1, this.maxVoiceLoad), 0, 1);
+      this.ambient.update(biomeProfile, this.world?.time ?? this.getNowSeconds(), biomeHarmony, this.ambientTension, ambientDucking);
+    } else {
+      this.ambient.silence();
+    }
+    this.captureMotionEvents(dt, false);
+    this.flushQueue();
+    this.cleanupMotionState();
+  }
+}
+
+
     class ParticleSystem {
       // Inicializa la instancia de ParticleSystem con las opciones y el estado base necesarios.
       constructor(world) {
@@ -1985,6 +5391,7 @@
       applyThrustAcceleration(ax, ay, dt, options = {}) {
         this.applyAcceleration(ax, ay, dt);
         this.emitThrusterParticles(ax, ay, dt, options);
+        audioDirector.onThruster(this, ax, ay, dt, options);
       }
 
       // Dibuja el estado interno en el contexto de render correspondiente.
@@ -5298,6 +8705,7 @@
         }
 
         this.aiWorld.addBody(interceptor);
+        audioDirector.onInterceptorLaunch(this, interceptor);
         return interceptor;
       }
 
@@ -7096,6 +10504,7 @@
       destroyShip(ship) {
         if (!ship || !ship.isAlive) return;
 
+        audioDirector.onShipDestroyed(ship);
         const explosionScale = this.getShipExplosionVisualScale(ship);
         const explosionColor = ship.color ?? '#ffffff';
 
@@ -7336,6 +10745,7 @@
         this.removeBody(asteroid);
 
         if (fragmentCount < 2) {
+          audioDirector.onAsteroidBroken(asteroid, { fragmentCount: 0, terminal: true });
           this.emitAsteroidTerminalBreakParticles(asteroid, divisionVector);
           if (dropCoins) {
             this.spawnCoinFromAsteroid(asteroid, coinSource ?? divisionVector);
@@ -7345,12 +10755,15 @@
 
         const childRadius = this.getAsteroidFragmentRadius(asteroid.radius, fragmentCount);
         if (childRadius < this.minAsteroidFragmentRadius) {
+          audioDirector.onAsteroidBroken(asteroid, { fragmentCount: 0, terminal: true });
           this.emitAsteroidTerminalBreakParticles(asteroid, divisionVector);
           if (dropCoins) {
             this.spawnCoinFromAsteroid(asteroid, coinSource ?? divisionVector);
           }
           return [];
         }
+
+        audioDirector.onAsteroidBroken(asteroid, { fragmentCount, terminal: false });
 
         const direction = this.resolveDirectionalVector(divisionVector, asteroid.angle);
         const angles = this.getAsteroidSubdivisionAngles(fragmentCount, direction.angle);
@@ -7392,7 +10805,6 @@
 
         return fragments;
       }
-
       // Gestiona emit el asteroide terminal break particles dentro del flujo principal del juego.
       emitAsteroidTerminalBreakParticles(asteroid, source = null) {
         if (!asteroid) {
@@ -7543,6 +10955,7 @@
       // Gestiona destroy el objetivo de chatarra dentro del flujo principal del juego.
       destroyScrap(scrap, source = null) {
         if (!scrap || scrap.isRemoved) return;
+        audioDirector.onScrapDestroyed(scrap);
         this.removeBody(scrap);
         this.spawnCoinFromScrap(scrap, source);
       }
@@ -7550,6 +10963,7 @@
       // Gestiona collect el objetivo de chatarra dentro del flujo principal del juego.
       collectScrap(ship, scrap) {
         if (!ship || !ship.isAlive || !scrap || scrap.isRemoved) return;
+        audioDirector.onScrapCollected(ship, scrap);
         this.removeBody(scrap);
         if (ship.kind === "dragonfly" || ship.kind === "tarantula") {
           ship.hp = Math.min(ship.maxHp, ship.hp + 5);
@@ -7560,6 +10974,7 @@
       collectCoin(ship, coin) {
         if (!ship.isAlive) return;
         const value = Math.max(1, coin.value ?? 1);
+        audioDirector.onCoinCollected(ship, coin, value);
         this.removeBody(coin);
         const interceptedStorage = typeof ship.handleCollectedCoin === "function" && ship.handleCollectedCoin(value, coin) === true;
         if (!interceptedStorage) {
@@ -7610,6 +11025,7 @@
         projectile.hasImpacted = true;
         projectile.isCollisionDisabled = true;
         this.removeBody(projectile);
+        audioDirector.onProjectileImpact(projectile, asteroid);
 
         if (asteroid.isRemoved) return;
 
@@ -7955,6 +11371,8 @@
           return false;
         }
 
+        audioDirector.onPlanetDestroyed(planetA, planetB, impactSpeed);
+
         const totalMass = Math.max(1, planetA.mass + planetB.mass);
         const totalArea = Math.max(1, planetA.radius * planetA.radius + planetB.radius * planetB.radius);
         const fragmentCount = this.getPlanetCollisionAsteroidCount(planetA, planetB);
@@ -8104,6 +11522,7 @@
           planet.mass += startMass;
         }
         this.updateBodyGravityProfile(planet);
+        audioDirector.onAsteroidAbsorbed(asteroid, planet);
         return true;
       }
 
@@ -8242,17 +11661,20 @@
 
         if (other.kind === "scrap") {
           this.removeBody(projectile);
+          audioDirector.onProjectileImpact(projectile, other);
           this.damageBody(other, projectile.damage ?? 1, projectile);
           return true;
         }
 
         if (isShipLike(other)) {
           this.removeBody(projectile);
+          audioDirector.onProjectileImpact(projectile, other);
           this.damageBody(other, projectile.damage ?? 1, projectile);
           return true;
         }
 
         if (other.kind === "planet") {
+          audioDirector.onProjectileImpact(projectile, other);
           this.removeBody(projectile);
           return true;
         }
@@ -8306,6 +11728,10 @@
         const rvy = b.vy - a.vy;
         const velAlongNormal = rvx * nx + rvy * ny;
         const impactSpeed = -velAlongNormal;
+
+        if (impactSpeed > 12) {
+          audioDirector.onPhysicalCollision(a, b, impactSpeed, { x: nx, y: ny });
+        }
 
         if (a.kind === "planet" && b.kind === "planet") {
           return this.explodePlanetsIntoAsteroids(a, b, impactSpeed, { x: -nx, y: -ny });
@@ -8567,7 +11993,7 @@
         this.world = world;
         this.player = player;
 
-        this.spawnVersion = "0.6.3";
+        this.spawnVersion = "0.7.11";
         this.spawnRadius = 7600;
         this.despawnRadius = 9000;
         this.baseBodyBudget = 160;
@@ -11043,6 +14469,22 @@
     factionSystem.setPair("Libélulas", "Tarántulas", 0, 0);
     factionSystem.setPair("Mineros", "Tarántulas", 0, 0);
 
+
+    const audioDirector = new AsteroidsAudioDirector({
+      world,
+      player: playerShip,
+      proceduralField
+    });
+
+    const resumeAudioFromGesture = () => {
+      audioDirector.handleUserGesture();
+    };
+
+    window.addEventListener("keydown", resumeAudioFromGesture, { capture: true });
+    window.addEventListener("mousedown", resumeAudioFromGesture, { capture: true });
+    window.addEventListener("touchstart", resumeAudioFromGesture, { capture: true, passive: true });
+
+
     // Aplica la faccion el impacto consequences dentro de esta parte de la logica.
     function applyFactionHitConsequences(attackerFaction, targetFaction, damageAmount = 1) {
       if (!attackerFaction || !targetFaction || attackerFaction === targetFaction) {
@@ -11077,6 +14519,28 @@
       scrollOffset: 0,
       maxScroll: 0,
       viewport: null
+    };
+
+    const audioChordOverlayState = {
+      isOpen: false
+    };
+
+    const audioDebugMenuState = {
+      isOpen: false,
+      scrollOffset: 0,
+      maxScroll: 0,
+      viewport: null,
+      buttons: [],
+      hoverIndex: -1,
+      panelBounds: null
+    };
+
+    const audioTensionDebugMenuState = {
+      isOpen: false,
+      scrollOffset: 0,
+      maxScroll: 0,
+      viewport: null,
+      panelBounds: null
     };
 
     const pauseState = {
@@ -11117,6 +14581,8 @@
 
     // Devuelve el menu desplazable activo calculado a partir del estado actual.
     function getActiveScrollableMenu() {
+      if (audioTensionDebugMenuState.isOpen && testCheats.testMode) return audioTensionDebugMenuState;
+      if (audioDebugMenuState.isOpen && testCheats.testMode) return audioDebugMenuState;
       if (shopState.isOpen) return shopState;
       if (factionMenuState.isOpen) return factionMenuState;
       if (diagnosticsMenuState.isOpen) return diagnosticsMenuState;
@@ -11616,6 +15082,7 @@
 
       if (factionSystem.getDisposition(playerShip.faction, station.faction) === "enemy") {
         world.lastMerchantRefusalTimer = 2.8;
+        audioDirector.onUiError("merchant-refusal");
         return;
       }
 
@@ -11626,10 +15093,12 @@
       shopState.buttons = [];
       shopState.hoverIndex = -1;
       resetMenuScroll(shopState);
+      audioDirector.onMenuOpen("shop");
     }
 
     // Gestiona close shop dentro del flujo principal del juego.
     function closeShop() {
+      const wasOpen = shopState.isOpen;
       shopState.isOpen = false;
       shopState.station = null;
       shopState.offers = [];
@@ -11638,6 +15107,9 @@
       shopState.hoverIndex = -1;
       resetMenuScroll(shopState);
       canvas.style.cursor = "crosshair";
+      if (wasOpen) {
+        audioDirector.onMenuClose("shop");
+      }
     }
 
     // Gestiona attempt purchase entry dentro del flujo principal del juego.
@@ -11645,27 +15117,49 @@
       if (!shopState.isOpen) return false;
 
       const entry = shopState.entries[index];
-      if (!entry || entry.available === false) return false;
-      if (playerShip.credits < entry.cost) return false;
+      if (!entry || entry.available === false) {
+        audioDirector.onUiError("shop-unavailable");
+        return false;
+      }
+      if (playerShip.credits < entry.cost) {
+        audioDirector.onUiError("shop-insufficient-credits");
+        return false;
+      }
 
       if (entry.kind === "service") {
         const definition = merchantServiceCatalog.find((service) => service.key === entry.key);
-        if (!definition) return false;
-        if (definition.isAvailable && !definition.isAvailable(playerShip)) return false;
+        if (!definition) {
+          audioDirector.onUiError("shop-invalid-entry");
+          return false;
+        }
+        if (definition.isAvailable && !definition.isAvailable(playerShip)) {
+          audioDirector.onUiError("shop-service-unavailable");
+          return false;
+        }
 
         playerShip.credits -= entry.cost;
         definition.apply(playerShip);
         refreshShopEntries();
+        audioDirector.onPurchase(entry);
         return true;
       }
 
       const offerIndex = Math.max(0, index - merchantServiceCatalog.length);
       const offer = shopState.offers[offerIndex];
-      if (!offer) return false;
+      if (!offer) {
+        audioDirector.onUiError("shop-invalid-offer");
+        return false;
+      }
 
       const definition = getShopDefinitionByKey(offer.key);
-      if (!definition) return false;
-      if (definition.isAvailable && !definition.isAvailable(playerShip)) return false;
+      if (!definition) {
+        audioDirector.onUiError("shop-invalid-definition");
+        return false;
+      }
+      if (definition.isAvailable && !definition.isAvailable(playerShip)) {
+        audioDirector.onUiError("shop-upgrade-unavailable");
+        return false;
+      }
 
       playerShip.credits -= offer.cost;
       definition.apply(playerShip);
@@ -11675,11 +15169,86 @@
       rerollShopOffer(offerIndex);
       refreshShopOffers();
       refreshShopEntries();
+      audioDirector.onPurchase(offer);
       return true;
     }
 
     // Gestiona menu hotkeys dentro del flujo principal del juego.
     function handleMenuHotkeys(e) {
+      if (e.code === "KeyA") {
+        if (!testCheats.testMode) {
+          return;
+        }
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        audioTensionDebugMenuState.isOpen = !audioTensionDebugMenuState.isOpen;
+        resetMenuScroll(audioTensionDebugMenuState);
+        if (audioTensionDebugMenuState.isOpen) {
+          audioDirector.onMenuOpen("tension-debug");
+        } else {
+          audioDirector.onMenuClose("tension-debug");
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (e.code === "KeyD" || e.code === "KeyB") {
+        if (!testCheats.testMode) {
+          return;
+        }
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        audioDebugMenuState.isOpen = !audioDebugMenuState.isOpen;
+        audioDebugMenuState.hoverIndex = -1;
+        resetMenuScroll(audioDebugMenuState);
+        if (audioDebugMenuState.isOpen) {
+          audioDirector.onMenuOpen("audio-debug");
+        } else {
+          audioDirector.onMenuClose("audio-debug");
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (audioTensionDebugMenuState.isOpen && testCheats.testMode && e.key === "Escape") {
+        audioTensionDebugMenuState.isOpen = false;
+        resetMenuScroll(audioTensionDebugMenuState);
+        audioDirector.onMenuClose("tension-debug");
+        e.preventDefault();
+        return;
+      }
+
+      if (audioDebugMenuState.isOpen && testCheats.testMode && e.key === "Escape") {
+        audioDebugMenuState.isOpen = false;
+        audioDebugMenuState.hoverIndex = -1;
+        resetMenuScroll(audioDebugMenuState);
+        audioDirector.onMenuClose("audio-debug");
+        e.preventDefault();
+        return;
+      }
+
+      if (e.code === "KeyS") {
+        if (!testCheats.testMode) {
+          return;
+        }
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        audioChordOverlayState.isOpen = !audioChordOverlayState.isOpen;
+        if (audioChordOverlayState.isOpen) {
+          audioDirector.onMenuOpen("diagnostics");
+        } else {
+          audioDirector.onMenuClose("diagnostics");
+        }
+        e.preventDefault();
+        return;
+      }
+
       if (e.code === "KeyP") {
         if (testCheats.testMode) {
           return;
@@ -11699,6 +15268,11 @@
         diagnosticsMenuState.isOpen = !diagnosticsMenuState.isOpen;
         pauseState.manual = false;
         resetMenuScroll(diagnosticsMenuState);
+        if (diagnosticsMenuState.isOpen) {
+          audioDirector.onMenuOpen("diagnostics");
+        } else {
+          audioDirector.onMenuClose("diagnostics");
+        }
         e.preventDefault();
         return;
       }
@@ -11712,6 +15286,9 @@
         if (factionMenuState.isOpen) {
           pauseState.manual = false;
           resetMenuScroll(factionMenuState);
+          audioDirector.onMenuOpen("factions");
+        } else {
+          audioDirector.onMenuClose("factions");
         }
         e.preventDefault();
         return;
@@ -11738,6 +15315,7 @@
       if (diagnosticsMenuState.isOpen && (e.key === "Escape" || e.code === "Tab")) {
         diagnosticsMenuState.isOpen = false;
         resetMenuScroll(diagnosticsMenuState);
+        audioDirector.onMenuClose("diagnostics");
         e.preventDefault();
         return;
       }
@@ -11745,6 +15323,7 @@
       if (factionMenuState.isOpen && (e.key === "Escape" || e.code === "KeyQ")) {
         factionMenuState.isOpen = false;
         resetMenuScroll(factionMenuState);
+        audioDirector.onMenuClose("factions");
         e.preventDefault();
         return;
       }
@@ -11816,8 +15395,9 @@
       mouse.y = pointer.y;
       updateMouseWorld();
 
+      const audioDebugHover = updateAudioDebugMenuHover(pointer);
       if (!shopState.isOpen) {
-        canvas.style.cursor = (factionMenuState.isOpen || diagnosticsMenuState.isOpen) ? "default" : "crosshair";
+        canvas.style.cursor = audioDebugHover >= 0 ? "pointer" : ((factionMenuState.isOpen || diagnosticsMenuState.isOpen || audioDebugMenuState.isOpen || audioTensionDebugMenuState.isOpen) ? "default" : "crosshair");
         return;
       }
 
@@ -11842,6 +15422,7 @@
 
     canvas.addEventListener("mouseleave", () => {
       shopState.hoverIndex = -1;
+      audioDebugMenuState.hoverIndex = -1;
       mouse.left = false;
       mouse.right = false;
       mouse.brakeLockTarget = null;
@@ -11864,6 +15445,16 @@
       mouse.x = pointer.x;
       mouse.y = pointer.y;
       updateMouseWorld();
+
+      if (event.button === 0 && handleAudioTensionDebugMenuPointerDown(pointer)) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.button === 0 && handleAudioDebugMenuPointerDown(pointer)) {
+        event.preventDefault();
+        return;
+      }
 
       if (!shopState.isOpen) {
         if (event.button === 0) {
@@ -11971,6 +15562,7 @@
         }));
       }
 
+      audioDirector.onShot(ship, { shotCount });
       return true;
     }
 
@@ -13449,6 +17041,547 @@
       ctx.restore();
     }
 
+    // Dibuja el nivel de tension global en modo pruebas sin requerir abrir el panel de audio.
+    function drawAudioTensionDebugOverlay() {
+      if (!testCheats.testMode) return;
+      const info = audioDirector.getAmbientTensionDebugInfo?.();
+      if (!info) return;
+
+      const panelW = 310;
+      const panelH = 66;
+      const panelX = Math.max(14, canvas.width * 0.5 - panelW * 0.5);
+      const panelY = 14;
+      const tension = clamp(info.current ?? 0, 0, 1);
+      const target = clamp(info.target ?? 0, 0, 1);
+      const impulse = clamp(info.impulse ?? 0, 0, 1);
+      const base = clamp(info.base ?? 0, 0, 1);
+      const conditions = clamp(info.conditions ?? 0, 0, 1);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(6, 10, 18, 0.74)';
+      ctx.fillRect(panelX, panelY, panelW, panelH);
+      ctx.strokeStyle = 'rgba(125, 220, 255, 0.34)';
+      ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillStyle = 'rgba(235,250,255,0.96)';
+      ctx.fillText(`TENSION ${Math.round(tension * 100)}%`, panelX + 12, panelY + 8);
+      ctx.font = '11px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.68)';
+      ctx.fillText(`eq ${Math.round(target * 100)} · base ${Math.round(base * 100)} · amenaza ${Math.round(conditions * 100)} · impulso +${Math.round(impulse * 100)}`, panelX + 116, panelY + 9);
+
+      const barX = panelX + 12;
+      const barY = panelY + 32;
+      const barW = panelW - 24;
+      ctx.fillStyle = 'rgba(255,255,255,0.14)';
+      ctx.fillRect(barX, barY, barW, 8);
+      ctx.fillStyle = 'rgba(125,220,255,0.82)';
+      ctx.fillRect(barX, barY, barW * tension, 8);
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fillRect(barX + barW * target - 1, barY - 2, 2, 12);
+
+      const topThreat = info.threats?.[0];
+      ctx.font = '10px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      if (topThreat) {
+        ctx.fillText(`amenaza mayor: ${topThreat.kind} ${Math.round(topThreat.distance)}u (+${Math.round(topThreat.contribution * 100)}%)`, panelX + 12, panelY + 48);
+      } else {
+        ctx.fillText('sin amenazas enemigas cercanas relevantes', panelX + 12, panelY + 48);
+      }
+      ctx.restore();
+    }
+
+    // Dibuja el panel lateral de acordes actuales por faccion y bioma sin pausar la simulacion.
+    function drawAudioChordOverlay() {
+      if (!audioChordOverlayState.isOpen || !testCheats.testMode) return;
+
+      const factionNames = Object.keys(FACTION_AUDIO_PROFILES);
+      const biomeIds = Object.keys(BIOME_AUDIO_PROFILES);
+      if (factionNames.length === 0 && biomeIds.length === 0) return;
+
+      const rowHeight = 38;
+      const sectionHeight = 24;
+      const headerHeight = 74;
+      const footerHeight = 28;
+      const panelWidth = Math.min(440, Math.max(350, canvas.width * 0.31));
+      const totalRowsHeight = sectionHeight * 2 + (factionNames.length + biomeIds.length) * rowHeight;
+      const panelHeight = Math.min(canvas.height - 28, headerHeight + footerHeight + totalRowsHeight + 16);
+      const panelX = canvas.width - panelWidth - 14;
+      const panelY = 14;
+      const rowX = panelX + 14;
+      const rowW = panelWidth - 28;
+      let y = panelY + headerHeight;
+      const currentBiomeState = proceduralField?.getCurrentBiomeState?.() ?? getBiomeStateAtWorld(playerShip.x, playerShip.y);
+      const currentBiomeId = currentBiomeState?.id ?? "black";
+
+      const drawSection = (label) => {
+        ctx.fillStyle = 'rgba(125, 220, 255, 0.14)';
+        ctx.fillRect(rowX, y + 2, rowW, sectionHeight - 5);
+        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = 'rgba(170,230,255,0.95)';
+        ctx.fillText(label, rowX + 8, y + 6);
+        y += sectionHeight;
+      };
+
+      const drawHarmonyRow = ({ label, harmony, profile, color = '#ffffff', active = false, detail = '' }) => {
+        ctx.fillStyle = active ? 'rgba(125,220,255,0.16)' : 'rgba(255,255,255,0.045)';
+        ctx.fillRect(rowX, y, rowW, rowHeight - 4);
+        ctx.strokeStyle = active ? 'rgba(125,220,255,0.42)' : 'rgba(255,255,255,0.08)';
+        ctx.strokeRect(rowX, y, rowW, rowHeight - 4);
+
+        ctx.font = 'bold 13px monospace';
+        ctx.fillStyle = color;
+        ctx.fillText(label, rowX + 8, y + 5);
+
+        ctx.font = '12px monospace';
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillText(formatHarmonyChordNotes(harmony, true), rowX + 8, y + 20);
+
+        const progression = profile.progression ?? profile.ambientProgression ?? [[0, 7, 12]];
+        const progressionLength = Math.max(1, progression.length);
+        ctx.textAlign = 'right';
+        ctx.font = '11px monospace';
+        ctx.fillStyle = 'rgba(255,255,255,0.66)';
+        ctx.fillText(`paso ${((harmony.stepIndex ?? 0) % progressionLength) + 1}/${progressionLength}`, rowX + rowW - 8, y + 5);
+        ctx.fillText(detail || `${Math.max(0.2, profile.stepDuration ?? 2).toFixed(2)}s`, rowX + rowW - 8, y + 20);
+        ctx.textAlign = 'left';
+        y += rowHeight;
+      };
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(6, 10, 18, 0.84)';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText('ACORDES', panelX + 16, panelY + 14);
+      ctx.font = '13px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      ctx.fillText('Modo pruebas · S para ocultar · facciones + biomas', panelX + 16, panelY + 42);
+
+      drawSection('FACCIONES');
+      for (let i = 0; i < factionNames.length; i++) {
+        const factionName = factionNames[i];
+        const harmony = audioDirector?.harmony?.getCurrentHarmony?.(factionName) ?? {
+          rootMidi: getFactionAudioProfile(factionName).rootMidi ?? 60,
+          chord: getFactionAudioProfile(factionName).progression?.[0] ?? [0, 4, 7],
+          stepIndex: 0
+        };
+        const profile = getFactionAudioProfile(factionName);
+        const relation = factionSystem?.getRelation?.(playerShip.faction, factionName) ?? 50;
+        const factionColor = factionName === playerShip.faction ? '#8fe5ff' : getFactionColor(relation);
+        drawHarmonyRow({
+          label: factionName,
+          harmony,
+          profile,
+          color: factionColor,
+          active: playerShip.faction === factionName,
+          detail: `${Math.max(0.2, profile.stepDuration ?? 2).toFixed(2)}s`
+        });
+      }
+
+      drawSection('BIOMAS');
+      for (let i = 0; i < biomeIds.length; i++) {
+        const biomeId = biomeIds[i];
+        const profile = getBiomeAudioProfile(biomeId);
+        const harmony = audioDirector?.biomeHarmony?.getCurrentHarmony?.(biomeId) ?? {
+          rootMidi: profile.ambientRootMidi ?? 36,
+          chord: profile.ambientProgression?.[0] ?? [0, 7, 12],
+          stepIndex: 0
+        };
+        drawHarmonyRow({
+          label: getBiomeDisplayName(biomeId),
+          harmony,
+          profile,
+          color: biomeId === currentBiomeId ? '#7ddcff' : 'rgba(255,255,255,0.86)',
+          active: biomeId === currentBiomeId,
+          detail: profile.harmonicMood ?? `${Math.max(0.35, profile.stepDuration ?? 4).toFixed(2)}s`
+        });
+      }
+
+      ctx.font = '12px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.52)';
+      const chordTensionInfo = audioDirector?.getAmbientTensionDebugInfo?.() ?? { current: audioDirector?.ambientTension ?? 0, target: 0 };
+      ctx.fillText(`Tension: ${Math.round(chordTensionInfo.current * 100)}% · equilibrio ${Math.round(chordTensionInfo.target * 100)}%`, panelX + 16, panelY + panelHeight - 18);
+      ctx.restore();
+    }
+
+
+    // Construye las filas del panel de depuracion de audio a partir de los tags centralizados.
+    function buildAudioDebugRows() {
+      const rows = [];
+      const addSection = (label) => rows.push({ kind: "section", label });
+      const addTag = (tag, label, detail = "") => rows.push({ kind: "tag", tag, label, detail });
+
+      addSection("AMBIENTE");
+      rows.push({ kind: "control", control: "ambientTension", label: "Tension ambiente", detail: "automatica: bioma + amenazas cercanas + impulsos por combate" });
+
+      addSection("MAESTROS");
+      for (const entry of AUDIO_DEBUG_CATEGORY_DEFINITIONS) {
+        addTag(entry.tag, entry.label, entry.detail);
+      }
+
+      addSection("EVENTOS");
+      for (const entry of AUDIO_DEBUG_EVENT_DEFINITIONS) {
+        addTag(`event:${entry.type}`, entry.label, entry.detail);
+      }
+
+      addSection("FACCIONES");
+      const factionNames = Object.keys(FACTION_AUDIO_PROFILES);
+      for (let i = 0; i < factionNames.length; i++) {
+        const factionName = factionNames[i];
+        addTag(`faction:${factionName}`, factionName, "todos los eventos sonoros de esta faccion");
+      }
+
+      addSection("EVENTOS POR FACCION");
+      for (let i = 0; i < AUDIO_DEBUG_FACTION_EVENT_TYPES.length; i++) {
+        const type = AUDIO_DEBUG_FACTION_EVENT_TYPES[i];
+        const label = AUDIO_DEBUG_EVENT_LABEL_BY_TYPE[type] ?? type;
+        for (let j = 0; j < factionNames.length; j++) {
+          const factionName = factionNames[j];
+          addTag(`event:${type}:faction:${factionName}`, `${label} · ${factionName}`, "cruce especifico evento/faccion");
+        }
+      }
+
+      addSection("CUERPOS / OBJETOS");
+      for (let i = 0; i < AUDIO_DEBUG_BODY_KINDS.length; i++) {
+        const kind = AUDIO_DEBUG_BODY_KINDS[i];
+        addTag(`body:${kind}`, kind, "cualquier sonido que involucre este tipo de cuerpo");
+      }
+
+      addSection("CASOS UTILES");
+      addTag("event:projectileImpact:target:asteroid", "Impactos en asteroides", "balas golpeando asteroides");
+      addTag("event:asteroidBroken:subject:asteroid", "Ruptura de asteroides", "capa especifica del asteroide roto");
+      addTag("event:physicalCollision:body:asteroid", "Colisiones con asteroides", "choques fisicos que involucren asteroides");
+      addTag("event:coinCollected:variant:blueCoin", "Moneda azul", "variante especial de moneda");
+      addTag("event:asteroidBroken:variant:terminal", "Asteroide destruido final", "ruptura terminal sin fragmentos posteriores");
+
+      return rows;
+    }
+
+    // Actualiza el hover de botones del panel de audio debug.
+    function updateAudioDebugMenuHover(pointer) {
+      if (!audioDebugMenuState.isOpen || !testCheats.testMode) {
+        audioDebugMenuState.hoverIndex = -1;
+        return -1;
+      }
+
+      let hoverIndex = -1;
+      const buttons = audioDebugMenuState.buttons ?? [];
+      for (let i = 0; i < buttons.length; i++) {
+        const button = buttons[i];
+        if (
+          pointer.x >= button.x &&
+          pointer.x <= button.x + button.w &&
+          pointer.y >= button.y &&
+          pointer.y <= button.y + button.h
+        ) {
+          hoverIndex = i;
+          break;
+        }
+      }
+      audioDebugMenuState.hoverIndex = hoverIndex;
+      return hoverIndex;
+    }
+
+    // Gestiona clicks sobre el panel de audio debug sin dispersar filtros en los emisores.
+    function handleAudioDebugMenuPointerDown(pointer) {
+      if (!audioDebugMenuState.isOpen || !testCheats.testMode) {
+        return false;
+      }
+
+      const hoverIndex = updateAudioDebugMenuHover(pointer);
+      if (hoverIndex >= 0) {
+        const button = audioDebugMenuState.buttons[hoverIndex];
+        if (button.tag) {
+          audioDirector.toggleAudioTag(button.tag);
+        }
+        return true;
+      }
+
+      const bounds = audioDebugMenuState.panelBounds;
+      if (!bounds) {
+        return false;
+      }
+      return pointer.x >= bounds.x && pointer.x <= bounds.x + bounds.w && pointer.y >= bounds.y && pointer.y <= bounds.y + bounds.h;
+    }
+
+    // Bloquea clicks dentro del panel de diagnostico de tension para evitar interacciones con el juego debajo.
+    function handleAudioTensionDebugMenuPointerDown(pointer) {
+      if (!audioTensionDebugMenuState.isOpen || !testCheats.testMode) {
+        return false;
+      }
+      const bounds = audioTensionDebugMenuState.panelBounds;
+      if (!bounds) {
+        return false;
+      }
+      return pointer.x >= bounds.x && pointer.x <= bounds.x + bounds.w && pointer.y >= bounds.y && pointer.y <= bounds.y + bounds.h;
+    }
+
+    // Dibuja el panel de depuracion de tags de audio.
+    function drawAudioDebugMenu() {
+      if (!audioDebugMenuState.isOpen || !testCheats.testMode) return;
+
+      const rows = buildAudioDebugRows();
+      const panelWidth = Math.min(580, Math.max(410, canvas.width * 0.39));
+      const panelHeight = Math.min(canvas.height - 28, Math.max(360, canvas.height - 28));
+      const panelX = 14;
+      const panelY = 14;
+      const headerHeight = 84;
+      const footerHeight = 28;
+      const contentX = panelX + 14;
+      const contentY = panelY + headerHeight;
+      const contentW = panelWidth - 28;
+      const contentH = panelHeight - headerHeight - footerHeight;
+      const sectionHeight = 28;
+      const rowHeight = 34;
+      const controlHeight = 68;
+      const getRowHeight = (row) => row.kind === "section" ? sectionHeight : row.kind === "control" ? controlHeight : rowHeight;
+      const totalHeight = rows.reduce((sum, row) => sum + getRowHeight(row), 0);
+
+      audioDebugMenuState.panelBounds = { x: panelX, y: panelY, w: panelWidth, h: panelHeight };
+      audioDebugMenuState.viewport = { x: contentX, y: contentY, w: contentW, h: contentH };
+      audioDebugMenuState.maxScroll = Math.max(0, totalHeight - contentH);
+      clampMenuScroll(audioDebugMenuState);
+      audioDebugMenuState.buttons = [];
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(5, 8, 14, 0.91)';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.strokeStyle = 'rgba(125, 220, 255, 0.38)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText('AUDIO DEBUG', panelX + 16, panelY + 14);
+      ctx.font = '13px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      ctx.fillText('D/B cierra · click alterna tags · cualquier tag deshabilitado silencia el evento', panelX + 16, panelY + 44);
+      ctx.fillStyle = 'rgba(255,210,120,0.9)';
+      const tensionInfo = audioDirector.getAmbientTensionDebugInfo?.() ?? { current: audioDirector.ambientTension ?? 0, target: 0, impulse: 0 };
+      ctx.fillText(`${audioDirector.disabledAudioTags.size} tags deshabilitados · tension ${Math.round(tensionInfo.current * 100)}% · equilibrio ${Math.round(tensionInfo.target * 100)}%`, panelX + 16, panelY + 64);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(contentX, contentY, contentW, contentH);
+      ctx.clip();
+
+      let y = contentY - audioDebugMenuState.scrollOffset;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const h = getRowHeight(row);
+        if (y + h >= contentY && y <= contentY + contentH) {
+          if (row.kind === "section") {
+            ctx.fillStyle = 'rgba(125, 220, 255, 0.16)';
+            ctx.fillRect(contentX, y + 4, contentW, h - 8);
+            ctx.font = 'bold 13px monospace';
+            ctx.fillStyle = 'rgba(170,230,255,0.95)';
+            ctx.fillText(row.label, contentX + 10, y + 8);
+          } else if (row.kind === "control" && row.control === "ambientTension") {
+            const info = audioDirector.getAmbientTensionDebugInfo?.() ?? { current: audioDirector.ambientTension ?? 0, target: 0, base: 0, conditions: 0, impulse: 0 };
+            const tension = clamp(info.current ?? 0, 0, 1);
+            const target = clamp(info.target ?? 0, 0, 1);
+            const sustained = clamp(info.sustained ?? 0, 0, 1);
+            const impulse = clamp(info.impulse ?? 0, 0, 1);
+            ctx.fillStyle = 'rgba(255,255,255,0.055)';
+            ctx.fillRect(contentX, y + 2, contentW, h - 4);
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.strokeRect(contentX, y + 2, contentW, h - 4);
+
+            ctx.font = 'bold 14px monospace';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`${row.label}: ${Math.round(tension * 100)}%`, contentX + 10, y + 7);
+            ctx.font = '11px monospace';
+            ctx.fillStyle = 'rgba(255,255,255,0.58)';
+            ctx.fillText(`equilibrio ${Math.round(target * 100)}% · base ${Math.round((info.base ?? 0) * 100)}% · amenazas ${Math.round((info.conditions ?? 0) * 100)}% · impulso +${Math.round(impulse * 100)}%`, contentX + 10, y + 25);
+
+            const barX = contentX + 10;
+            const barY = y + 45;
+            const barW = contentW - 20;
+            ctx.fillStyle = 'rgba(255,255,255,0.12)';
+            ctx.fillRect(barX, barY, barW, 6);
+            ctx.fillStyle = 'rgba(125,220,255,0.78)';
+            ctx.fillRect(barX, barY, barW * tension, 6);
+            ctx.fillStyle = 'rgba(255,210,120,0.6)';
+            ctx.fillRect(barX, barY + 8, barW * sustained, 4);
+            ctx.fillStyle = 'rgba(255,120,120,0.72)';
+            ctx.fillRect(barX + barW * sustained, barY + 8, Math.max(1, barW * Math.min(impulse, 1 - sustained)), 4);
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillRect(barX + barW * target - 1, barY - 2, 2, 16);
+          } else {
+            const disabled = audioDirector.isAudioTagDisabled(row.tag);
+            const button = { x: contentX, y: y + 2, w: contentW, h: h - 4, tag: row.tag };
+            const buttonIndex = audioDebugMenuState.buttons.length;
+            audioDebugMenuState.buttons.push(button);
+            const hovered = audioDebugMenuState.hoverIndex === buttonIndex;
+
+            ctx.fillStyle = disabled
+              ? (hovered ? 'rgba(255,110,110,0.28)' : 'rgba(255,110,110,0.18)')
+              : (hovered ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.055)');
+            ctx.fillRect(button.x, button.y, button.w, button.h);
+            ctx.strokeStyle = disabled ? 'rgba(255,120,120,0.42)' : 'rgba(255,255,255,0.08)';
+            ctx.strokeRect(button.x, button.y, button.w, button.h);
+
+            ctx.font = 'bold 14px monospace';
+            ctx.fillStyle = disabled ? '#ff9a9a' : '#ffffff';
+            ctx.fillText(disabled ? 'OFF' : 'ON', contentX + 10, y + 9);
+
+            ctx.font = '14px monospace';
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillText(row.label, contentX + 64, y + 6);
+
+            ctx.font = '11px monospace';
+            ctx.fillStyle = 'rgba(255,255,255,0.52)';
+            ctx.fillText(row.detail || row.tag, contentX + 64, y + 22);
+          }
+        }
+        y += h;
+      }
+      ctx.restore();
+
+      drawVerticalScrollbar(panelX + panelWidth - 16, contentY, contentH, totalHeight, audioDebugMenuState.scrollOffset, 'rgba(125, 220, 255, 0.95)');
+
+      ctx.fillStyle = 'rgba(255,255,255,0.56)';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Tension automatica: bioma + amenazas cercanas + impulsos de combate. Los tags filtran eventos desde el director.', panelX + panelWidth * 0.5, panelY + panelHeight - 19);
+      ctx.restore();
+    }
+
+    // Dibuja el panel de diagnostico de tension ambiental.
+    function drawAudioTensionDebugMenu() {
+      if (!audioTensionDebugMenuState.isOpen || !testCheats.testMode) return;
+
+      const info = audioDirector.getAmbientTensionDebugInfo?.() ?? { current: 0, target: 0, equilibriumSources: [], impulseLog: [] };
+      const equilibriumSources = info.equilibriumSources ?? [];
+      const impulseLog = info.impulseLog ?? [];
+      const panelWidth = Math.min(720, Math.max(520, canvas.width * 0.46));
+      const panelHeight = Math.min(canvas.height - 28, Math.max(420, canvas.height - 28));
+      const panelX = canvas.width - panelWidth - 14;
+      const panelY = 14;
+      const headerHeight = 98;
+      const footerHeight = 28;
+      const contentX = panelX + 14;
+      const contentY = panelY + headerHeight;
+      const contentW = panelWidth - 28;
+      const contentH = panelHeight - headerHeight - footerHeight;
+      const sectionHeight = 28;
+      const rowHeight = 30;
+
+      const rows = [];
+      rows.push({ kind: "section", label: "EQUILIBRIO ACTIVO" });
+      if (equilibriumSources.length === 0) {
+        rows.push({ kind: "empty", label: "Sin fuentes activas de equilibrio", detail: "la tension quiere volver a calma" });
+      } else {
+        for (let i = 0; i < equilibriumSources.length; i++) {
+          rows.push({ kind: "source", ...equilibriumSources[i] });
+        }
+      }
+      rows.push({ kind: "section", label: "ULTIMOS 100 IMPULSOS" });
+      if (impulseLog.length === 0) {
+        rows.push({ kind: "empty", label: "Sin impulsos recientes", detail: "disparos, casi impactos y muertes apareceran aqui" });
+      } else {
+        for (let i = 0; i < impulseLog.length; i++) {
+          rows.push({ kind: "impulse", ...impulseLog[i] });
+        }
+      }
+
+      const getRowHeight = (row) => row.kind === "section" ? sectionHeight : rowHeight;
+      const totalHeight = rows.reduce((sum, row) => sum + getRowHeight(row), 0);
+      audioTensionDebugMenuState.panelBounds = { x: panelX, y: panelY, w: panelWidth, h: panelHeight };
+      audioTensionDebugMenuState.viewport = { x: contentX, y: contentY, w: contentW, h: contentH };
+      audioTensionDebugMenuState.maxScroll = Math.max(0, totalHeight - contentH);
+      clampMenuScroll(audioTensionDebugMenuState);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(7, 6, 12, 0.92)';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.strokeStyle = 'rgba(255, 190, 115, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText('TENSION DEBUG', panelX + 16, panelY + 14);
+      ctx.font = '13px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      ctx.fillText('A cierra · fuentes de equilibrio + historial de impulsos recientes', panelX + 16, panelY + 44);
+      ctx.fillStyle = 'rgba(255,210,120,0.95)';
+      ctx.fillText(`actual ${Math.round((info.current ?? 0) * 100)}% · equilibrio ${Math.round((info.target ?? 0) * 100)}% · impulso +${Math.round((info.impulse ?? 0) * 100)}%`, panelX + 16, panelY + 66);
+
+      const barX = panelX + 16;
+      const barY = panelY + 84;
+      const barW = panelWidth - 32;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(barX, barY, barW, 6);
+      ctx.fillStyle = 'rgba(255,190,115,0.84)';
+      ctx.fillRect(barX, barY, barW * clamp(info.current ?? 0, 0, 1), 6);
+      ctx.fillStyle = 'rgba(125,220,255,0.85)';
+      ctx.fillRect(barX + barW * clamp(info.target ?? 0, 0, 1) - 1, barY - 3, 2, 12);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(contentX, contentY, contentW, contentH);
+      ctx.clip();
+
+      let y = contentY - audioTensionDebugMenuState.scrollOffset;
+      const formatAmount = (amount) => `${amount >= 0 ? '+' : ''}${(amount * 100).toFixed(amount < 0.01 ? 1 : 0)}%`;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const h = getRowHeight(row);
+        if (y + h >= contentY && y <= contentY + contentH) {
+          if (row.kind === "section") {
+            ctx.fillStyle = 'rgba(255,190,115,0.16)';
+            ctx.fillRect(contentX, y + 4, contentW, h - 8);
+            ctx.font = 'bold 13px monospace';
+            ctx.fillStyle = 'rgba(255,220,170,0.95)';
+            ctx.fillText(row.label, contentX + 10, y + 8);
+          } else {
+            const isImpulse = row.kind === "impulse";
+            ctx.fillStyle = isImpulse ? 'rgba(255,255,255,0.055)' : 'rgba(125,220,255,0.06)';
+            ctx.fillRect(contentX, y + 2, contentW, h - 4);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.strokeRect(contentX, y + 2, contentW, h - 4);
+
+            ctx.font = 'bold 13px monospace';
+            ctx.fillStyle = row.kind === "empty" ? 'rgba(255,255,255,0.45)' : (isImpulse ? '#ffcf8a' : '#8fe5ff');
+            const amountText = row.kind === "empty" ? '—' : formatAmount(row.amount ?? 0);
+            ctx.fillText(amountText, contentX + 10, y + 7);
+
+            ctx.font = '13px monospace';
+            ctx.fillStyle = row.kind === "empty" ? 'rgba(255,255,255,0.48)' : 'rgba(255,255,255,0.92)';
+            ctx.fillText(row.label ?? '', contentX + 78, y + 5);
+
+            ctx.font = '11px monospace';
+            ctx.fillStyle = 'rgba(255,255,255,0.52)';
+            ctx.fillText(row.detail ?? '', contentX + 78, y + 19);
+          }
+        }
+        y += h;
+      }
+      ctx.restore();
+
+      drawVerticalScrollbar(panelX + panelWidth - 16, contentY, contentH, totalHeight, audioTensionDebugMenuState.scrollOffset, 'rgba(255,190,115,0.95)');
+
+      ctx.fillStyle = 'rgba(255,255,255,0.56)';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Equilibrio = base de bioma + amenazas activas. Impulsos = eventos discretos que elevan tension temporalmente.', panelX + panelWidth * 0.5, panelY + panelHeight - 19);
+      ctx.restore();
+    }
+
     // Dibuja la faccion overlay en el contexto de render correspondiente.
     function drawFactionOverlay() {
       if (!factionMenuState.isOpen) return;
@@ -13721,6 +17854,10 @@
       world.draw(ctx, camera, canvas.width, canvas.height);
       drawBrakeLockIndicator();
       drawHUD();
+      drawAudioTensionDebugOverlay();
+      drawAudioChordOverlay();
+      drawAudioDebugMenu();
+      drawAudioTensionDebugMenu();
       drawDiagnosticsOverlay();
       drawFactionOverlay();
       drawShopOverlay();
@@ -13761,10 +17898,20 @@
       performanceMonitor.fps = 1 / Math.max(1e-6, performanceMonitor.smoothedFrameDt);
 
       let dt = clamp(rawDt, 0, 0.05);
+      const simulationActive = !world.isGameOver && !isSimulationPaused();
 
-      if (!world.isGameOver && !isSimulationPaused()) {
+      if (simulationActive) {
         tickSimulation(dt);
       }
+
+      const currentBiomeState = proceduralField?.getCurrentBiomeState?.() ?? getBiomeStateAtWorld(playerShip.x, playerShip.y);
+      audioDirector.update(dt, {
+        world,
+        player: playerShip,
+        proceduralField,
+        biomeState: currentBiomeState,
+        simulationActive
+      });
 
       updateCamera(dt);
       draw();
@@ -13780,6 +17927,9 @@
       factionSystem,
       factionMenuState,
       diagnosticsMenuState,
+      audioChordOverlayState,
+      audioDebugMenuState,
+      audioTensionDebugMenuState,
       performanceMonitor,
       keys,
       testCheats,
@@ -13790,6 +17940,7 @@
       fireProjectile,
       updateNpcWeapons,
       tickSimulation,
+      audioDirector,
       // Devuelve counts calculado a partir del estado y los parametros recibidos.
       getCounts() {
         const countsByKind = {};
