@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asteroids 0.7.11</title>
+  <title>Asteroids 0.7.14</title>
   <style>
     html, body {
       margin: 0;
@@ -188,6 +188,8 @@
       return {
         testMode: false,
         invincibility: false,
+        infiniteAmmo: false,
+        infiniteFuel: false,
         dragTarget: null,
         activationSequence: ["Digit8", "Digit0", "Digit8", "Digit0"],
         activationProgress: 0,
@@ -214,6 +216,13 @@
               audioTensionDebugMenuState.isOpen = false;
               audioTensionDebugMenuState.scrollOffset = 0;
             }
+            if (typeof cheatMenuState !== "undefined") {
+              cheatMenuState.isOpen = false;
+              cheatMenuState.hoverIndex = -1;
+              cheatMenuState.buttons = [];
+            }
+            this.infiniteAmmo = false;
+            this.infiniteFuel = false;
           }
           this.syncGlobalFlag();
         },
@@ -240,13 +249,53 @@
         isPlayerInvincible() {
           return this.testMode && this.invincibility;
         },
+        // Alterna una trampa booleana desde el panel centralizado de pruebas.
+        toggleCheat(key) {
+          if (key === 'invincibility') {
+            this.invincibility = !this.invincibility;
+            if (this.invincibility && playerShip?.isAlive) {
+              playerShip.hp = playerShip.maxHp;
+            }
+            return true;
+          }
+          if (key === 'infiniteAmmo') {
+            this.infiniteAmmo = !this.infiniteAmmo;
+            this.applyResourceCheats();
+            return true;
+          }
+          if (key === 'infiniteFuel') {
+            this.infiniteFuel = !this.infiniteFuel;
+            this.applyResourceCheats();
+            return true;
+          }
+          return false;
+        },
+        // Agrega creditos al jugador desde el menu de trampas.
+        grantCredits(amount = 10000) {
+          if (!playerShip) return false;
+          playerShip.credits += Math.max(0, amount);
+          return true;
+        },
+        // Mantiene los recursos de prueba llenos mientras las trampas correspondientes esten activas.
+        applyResourceCheats() {
+          if (!playerShip) return;
+          if (this.infiniteAmmo) {
+            playerShip.ammo = playerShip.maxAmmo;
+          }
+          if (this.infiniteFuel) {
+            playerShip.fuel = playerShip.maxFuel;
+          }
+          if (this.invincibility && playerShip.isAlive) {
+            playerShip.hp = playerShip.maxHp;
+          }
+        },
         // Gestiona la tecla down dentro del flujo principal del juego.
         handleKeyDown(event) {
           if (!this.testMode || world.isGameOver) {
             return false;
           }
 
-          if (event.repeat && event.code !== 'KeyC') {
+          if (event.repeat) {
             return this.isReservedTestHotkey(event.code);
           }
 
@@ -257,19 +306,6 @@
 
           if (event.code === 'KeyO') {
             this.spawnAsteroidAtCursor();
-            return true;
-          }
-
-          if (event.code === 'KeyI') {
-            this.invincibility = !this.invincibility;
-            if (this.invincibility) {
-              playerShip.hp = playerShip.maxHp;
-            }
-            return true;
-          }
-
-          if (event.code === 'KeyM') {
-            playerShip.credits += 1000;
             return true;
           }
 
@@ -288,21 +324,12 @@
             return true;
           }
 
-          if (event.code === 'KeyC') {
-            if (!this.dragTarget || this.dragTarget.isRemoved) {
-              this.dragTarget = findManipulableBodyUnderCursor();
-            }
-            return true;
-          }
-
           return false;
         },
         // Indica si la reserva el modo de pruebas el atajo cumple la condicion esperada para esta logica.
         isReservedTestHotkey(code) {
           return code === 'KeyP' ||
             code === 'KeyO' ||
-            code === 'KeyI' ||
-            code === 'KeyM' ||
             code === 'KeyZ' ||
             code === 'KeyX' ||
             code === 'Digit1' ||
@@ -381,10 +408,6 @@
         },
         // Gestiona la tecla up dentro del flujo principal del juego.
         handleKeyUp(event) {
-          if (event.code === 'KeyC') {
-            this.dragTarget = null;
-            return true;
-          }
           return false;
         },
         // Genera el planeta at cursor usando la configuracion y el contexto actuales.
@@ -438,30 +461,7 @@
           if (!this.testMode) {
             return;
           }
-
-          if (this.invincibility && playerShip.isAlive) {
-            playerShip.hp = playerShip.maxHp;
-          }
-
-          const target = this.dragTarget;
-          if (!keys.KeyC || !target || target.isRemoved) {
-            if (target && target.isRemoved) {
-              this.dragTarget = null;
-            }
-            return;
-          }
-
-          const dx = mouse.worldX - target.x;
-          const dy = mouse.worldY - target.y;
-          const dist = Math.hypot(dx, dy);
-          if (!(dist > 0.001)) {
-            return;
-          }
-
-          const accelLimit = target.kind === 'planet' ? 320 : target.kind === 'asteroid' ? 760 : 980;
-          const accel = clamp(dist * 4.2, 0, accelLimit);
-          target.applyAcceleration((dx / dist) * accel, (dy / dist) * accel, dt);
-          target.angularVelocity *= 0.96;
+          this.applyResourceCheats();
         }
       };
     }
@@ -1788,11 +1788,6 @@ function getBiomeDisplayName(biomeId) {
 
 function getBodyDisplayName(kind) {
   const labels = {
-    asteroid: "Asteroide",
-    planet: "Planeta",
-    scrap: "Chatarra",
-    coin: "Moneda",
-    blueCoin: "Moneda azul",
     ship: "Jugador",
     station: "Estacion",
     merchantEscort: "Escolta mercader",
@@ -1801,10 +1796,18 @@ function getBodyDisplayName(kind) {
     dragonfly: "Libelula",
     miner: "Minero",
     carrier: "Portanaves",
+    interceptor: "Interceptor",
     tarantula: "Tarantula",
-    interceptor: "Interceptor"
+    planet: "Planeta",
+    asteroid: "Asteroide",
+    projectile: "Proyectil",
+    scrap: "Chatarra",
+    coin: "Moneda",
+    blueCoin: "Moneda azul",
+    default: "Cuerpo"
   };
-  return labels[kind] ?? kind ?? "Cuerpo";
+  const key = `${kind ?? "default"}`;
+  return labels[key] ?? key;
 }
 
 function getEmitterAudioKind(body) {
@@ -2755,10 +2758,10 @@ class AsteroidsAudioDirector {
   }
 
   recordAmbientTensionImpulse(amount, label = "Impulso de tension", detail = "") {
-    const safeAmount = Number.isFinite(amount) ? amount : 0;
-    if (!(safeAmount > 0.0001)) {
+    if (!Number.isFinite(amount)) {
       return;
     }
+    const safeAmount = Math.max(0, amount);
     const resolved = this.getTensionImpulseLabel(label, detail);
     this.ambientTensionImpulseLog.unshift({
       amount: safeAmount,
@@ -2772,11 +2775,13 @@ class AsteroidsAudioDirector {
   }
 
   addAmbientTensionImpulse(amount, label = "Impulso de tension", detail = "") {
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount < 0) {
       return this.ambientImpulseTension;
     }
     const previousImpulse = this.ambientImpulseTension;
-    this.ambientImpulseTension = clamp(this.ambientImpulseTension + amount, 0, AUDIO_TENSION_IMPULSE_CAP);
+    if (amount > 0) {
+      this.ambientImpulseTension = clamp(this.ambientImpulseTension + amount, 0, AUDIO_TENSION_IMPULSE_CAP);
+    }
     const applied = Math.max(0, this.ambientImpulseTension - previousImpulse);
     this.recordAmbientTensionImpulse(applied, label, detail);
     this.ambientTension = this.getEffectiveAmbientTension();
@@ -2808,9 +2813,11 @@ class AsteroidsAudioDirector {
 
     if (event.type === "shot") {
       const shotCount = Math.max(1, event.stackCount ?? 1);
-      const amount = clamp(0.012 * shotCount * distanceFactor, 0.002, 0.035);
-      const source = event.emitter === this.player ? "del jugador" : (event.faction ? `de ${event.faction}` : "externo");
-      this.addAmbientTensionImpulse(amount, `Disparo ${source}`, `${shotCount} proyectil(es) · cercania ${Math.round(distanceFactor * 100)}%`);
+      const isPlayerShot = event.emitter === this.player;
+      const amount = isPlayerShot ? 0 : clamp(0.012 * shotCount * distanceFactor, 0.002, 0.035);
+      const source = isPlayerShot ? "del jugador" : (event.faction ? `de ${event.faction}` : "externo");
+      const detailPrefix = isPlayerShot ? "no incrementa tension" : `${shotCount} proyectil(es)`;
+      this.addAmbientTensionImpulse(amount, `Disparo ${source}`, `${detailPrefix} · cercania ${Math.round(distanceFactor * 100)}%`);
       return;
     }
 
@@ -11993,7 +12000,7 @@ class AsteroidsAudioDirector {
         this.world = world;
         this.player = player;
 
-        this.spawnVersion = "0.7.11";
+        this.spawnVersion = "0.7.14";
         this.spawnRadius = 7600;
         this.despawnRadius = 9000;
         this.baseBodyBudget = 160;
@@ -14540,6 +14547,16 @@ class AsteroidsAudioDirector {
       scrollOffset: 0,
       maxScroll: 0,
       viewport: null,
+      panelBounds: null,
+      showOnlyPositiveImpulses: false,
+      checkboxBounds: null,
+      checkboxHover: false
+    };
+
+    const cheatMenuState = {
+      isOpen: false,
+      buttons: [],
+      hoverIndex: -1,
       panelBounds: null
     };
 
@@ -15175,6 +15192,26 @@ class AsteroidsAudioDirector {
 
     // Gestiona menu hotkeys dentro del flujo principal del juego.
     function handleMenuHotkeys(e) {
+      if (e.code === "KeyC") {
+        if (!testCheats.testMode) {
+          return;
+        }
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        cheatMenuState.isOpen = !cheatMenuState.isOpen;
+        cheatMenuState.hoverIndex = -1;
+        cheatMenuState.buttons = [];
+        if (cheatMenuState.isOpen) {
+          audioDirector.onMenuOpen("cheats");
+        } else {
+          audioDirector.onMenuClose("cheats");
+        }
+        e.preventDefault();
+        return;
+      }
+
       if (e.code === "KeyA") {
         if (!testCheats.testMode) {
           return;
@@ -15210,6 +15247,15 @@ class AsteroidsAudioDirector {
         } else {
           audioDirector.onMenuClose("audio-debug");
         }
+        e.preventDefault();
+        return;
+      }
+
+      if (cheatMenuState.isOpen && testCheats.testMode && e.key === "Escape") {
+        cheatMenuState.isOpen = false;
+        cheatMenuState.hoverIndex = -1;
+        cheatMenuState.buttons = [];
+        audioDirector.onMenuClose("cheats");
         e.preventDefault();
         return;
       }
@@ -15395,9 +15441,13 @@ class AsteroidsAudioDirector {
       mouse.y = pointer.y;
       updateMouseWorld();
 
+      const cheatHover = updateCheatMenuHover(pointer);
       const audioDebugHover = updateAudioDebugMenuHover(pointer);
+      const audioTensionHover = updateAudioTensionDebugMenuHover(pointer);
       if (!shopState.isOpen) {
-        canvas.style.cursor = audioDebugHover >= 0 ? "pointer" : ((factionMenuState.isOpen || diagnosticsMenuState.isOpen || audioDebugMenuState.isOpen || audioTensionDebugMenuState.isOpen) ? "default" : "crosshair");
+        const pointerHover = cheatHover >= 0 || audioDebugHover >= 0 || audioTensionHover;
+        const menuOpen = factionMenuState.isOpen || diagnosticsMenuState.isOpen || audioDebugMenuState.isOpen || audioTensionDebugMenuState.isOpen || cheatMenuState.isOpen;
+        canvas.style.cursor = pointerHover ? "pointer" : (menuOpen ? "default" : "crosshair");
         return;
       }
 
@@ -15423,6 +15473,8 @@ class AsteroidsAudioDirector {
     canvas.addEventListener("mouseleave", () => {
       shopState.hoverIndex = -1;
       audioDebugMenuState.hoverIndex = -1;
+      audioTensionDebugMenuState.checkboxHover = false;
+      cheatMenuState.hoverIndex = -1;
       mouse.left = false;
       mouse.right = false;
       mouse.brakeLockTarget = null;
@@ -15445,6 +15497,11 @@ class AsteroidsAudioDirector {
       mouse.x = pointer.x;
       mouse.y = pointer.y;
       updateMouseWorld();
+
+      if (event.button === 0 && handleCheatMenuPointerDown(pointer)) {
+        event.preventDefault();
+        return;
+      }
 
       if (event.button === 0 && handleAudioTensionDebugMenuPointerDown(pointer)) {
         event.preventDefault();
@@ -16701,10 +16758,7 @@ class AsteroidsAudioDirector {
 
       if (testCheats.testMode) {
         ctx.fillStyle = "#7ddcff";
-        ctx.fillText(`modo pruebas: ON | invulnerable ${testCheats.invincibility ? 'SI' : 'NO'} | spawns ${proceduralField.spawnsEnabled ? 'ON' : 'OFF'}`, 20, 160);
-        if (testCheats.dragTarget && !testCheats.dragTarget.isRemoved) {
-          ctx.fillText(`objeto sujeto con C: ${testCheats.dragTarget.kind}`, 20, 180);
-        }
+        ctx.fillText(`modo pruebas: ON | C trampas | invulnerable ${testCheats.invincibility ? 'SI' : 'NO'} | municion ${testCheats.infiniteAmmo ? '∞' : 'normal'} | combustible ${testCheats.infiniteFuel ? '∞' : 'normal'} | spawns ${proceduralField.spawnsEnabled ? 'ON' : 'OFF'}`, 20, 160);
       }
 
       const drawContextLine = (message, color = "white") => {
@@ -17267,6 +17321,163 @@ class AsteroidsAudioDirector {
     }
 
     // Actualiza el hover de botones del panel de audio debug.
+    // Devuelve las filas del menu de trampas de modo debug.
+    function buildCheatMenuRows() {
+      return [
+        {
+          key: 'infiniteAmmo',
+          kind: 'toggle',
+          label: 'Municion infinita',
+          enabled: !!testCheats.infiniteAmmo,
+          detail: testCheats.infiniteAmmo ? 'la municion se mantiene llena' : 'la municion se consume normalmente'
+        },
+        {
+          key: 'infiniteFuel',
+          kind: 'toggle',
+          label: 'Combustible infinito',
+          enabled: !!testCheats.infiniteFuel,
+          detail: testCheats.infiniteFuel ? 'el combustible se mantiene lleno' : 'el combustible se consume normalmente'
+        },
+        {
+          key: 'invincibility',
+          kind: 'toggle',
+          label: 'Inmortalidad',
+          enabled: !!testCheats.invincibility,
+          detail: testCheats.invincibility ? 'la vida se mantiene al maximo' : 'la nave recibe dano normalmente'
+        },
+        {
+          key: 'grantCredits',
+          kind: 'button',
+          label: '+10000 creditos',
+          enabled: false,
+          detail: 'agrega creditos inmediatamente'
+        }
+      ];
+    }
+
+    // Actualiza el hover del menu de trampas.
+    function updateCheatMenuHover(pointer) {
+      if (!cheatMenuState.isOpen || !testCheats.testMode) {
+        cheatMenuState.hoverIndex = -1;
+        return -1;
+      }
+
+      let hoverIndex = -1;
+      const buttons = cheatMenuState.buttons ?? [];
+      for (let i = 0; i < buttons.length; i++) {
+        const button = buttons[i];
+        if (
+          pointer.x >= button.x &&
+          pointer.x <= button.x + button.w &&
+          pointer.y >= button.y &&
+          pointer.y <= button.y + button.h
+        ) {
+          hoverIndex = i;
+          break;
+        }
+      }
+      cheatMenuState.hoverIndex = hoverIndex;
+      return hoverIndex;
+    }
+
+    // Gestiona clicks del menu de trampas sin dispersar atajos por el juego.
+    function handleCheatMenuPointerDown(pointer) {
+      if (!cheatMenuState.isOpen || !testCheats.testMode) {
+        return false;
+      }
+
+      const hoverIndex = updateCheatMenuHover(pointer);
+      if (hoverIndex >= 0) {
+        const button = cheatMenuState.buttons[hoverIndex];
+        if (button.key === 'grantCredits') {
+          testCheats.grantCredits(10000);
+          audioDirector.onPurchase({ cost: 0 });
+        } else {
+          testCheats.toggleCheat(button.key);
+          audioDirector.onMenuOpen('cheat-toggle');
+        }
+        return true;
+      }
+
+      const bounds = cheatMenuState.panelBounds;
+      if (!bounds) {
+        return false;
+      }
+      return pointer.x >= bounds.x && pointer.x <= bounds.x + bounds.w && pointer.y >= bounds.y && pointer.y <= bounds.y + bounds.h;
+    }
+
+    // Dibuja el menu centralizado de trampas de modo debug.
+    function drawCheatMenu() {
+      if (!cheatMenuState.isOpen || !testCheats.testMode) return;
+
+      const rows = buildCheatMenuRows();
+      const panelWidth = Math.min(430, Math.max(360, canvas.width * 0.3));
+      const panelHeight = 292;
+      const panelX = Math.round((canvas.width - panelWidth) * 0.5);
+      const panelY = Math.max(18, Math.round(canvas.height * 0.16));
+      const contentX = panelX + 18;
+      let y = panelY + 78;
+      const rowHeight = 44;
+
+      cheatMenuState.panelBounds = { x: panelX, y: panelY, w: panelWidth, h: panelHeight };
+      cheatMenuState.buttons = [];
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(6, 10, 18, 0.93)';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.strokeStyle = 'rgba(125, 220, 255, 0.42)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText('TRAMPAS', panelX + 18, panelY + 14);
+      ctx.font = '13px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText('C cierra · click alterna opciones', panelX + 18, panelY + 44);
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const button = {
+          key: row.key,
+          x: contentX,
+          y,
+          w: panelWidth - 36,
+          h: rowHeight - 8
+        };
+        const buttonIndex = cheatMenuState.buttons.length;
+        cheatMenuState.buttons.push(button);
+        const hovered = cheatMenuState.hoverIndex === buttonIndex;
+        const isToggle = row.kind === 'toggle';
+        const enabled = !!row.enabled;
+
+        ctx.fillStyle = hovered ? 'rgba(125,220,255,0.18)' : 'rgba(255,255,255,0.06)';
+        ctx.fillRect(button.x, button.y, button.w, button.h);
+        ctx.strokeStyle = hovered ? 'rgba(125,220,255,0.62)' : 'rgba(255,255,255,0.14)';
+        ctx.strokeRect(button.x, button.y, button.w, button.h);
+
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = row.kind === 'button' ? 'rgba(255,220,120,0.95)' : (enabled ? 'rgba(125,255,170,0.95)' : 'rgba(255,255,255,0.92)');
+        ctx.fillText(row.label, button.x + 12, button.y + 8);
+
+        if (isToggle) {
+          ctx.textAlign = 'right';
+          ctx.fillStyle = enabled ? 'rgba(125,255,170,0.95)' : 'rgba(255,140,140,0.9)';
+          ctx.fillText(enabled ? 'ON' : 'OFF', button.x + button.w - 12, button.y + 8);
+          ctx.textAlign = 'left';
+        }
+
+        ctx.font = '12px monospace';
+        ctx.fillStyle = 'rgba(255,255,255,0.62)';
+        ctx.fillText(row.detail, button.x + 12, button.y + 25);
+        y += rowHeight;
+      }
+
+      ctx.restore();
+    }
+
     function updateAudioDebugMenuHover(pointer) {
       if (!audioDebugMenuState.isOpen || !testCheats.testMode) {
         audioDebugMenuState.hoverIndex = -1;
@@ -17313,11 +17524,29 @@ class AsteroidsAudioDirector {
       return pointer.x >= bounds.x && pointer.x <= bounds.x + bounds.w && pointer.y >= bounds.y && pointer.y <= bounds.y + bounds.h;
     }
 
-    // Bloquea clicks dentro del panel de diagnostico de tension para evitar interacciones con el juego debajo.
+    function updateAudioTensionDebugMenuHover(pointer) {
+      if (!audioTensionDebugMenuState.isOpen || !testCheats.testMode) {
+        audioTensionDebugMenuState.checkboxHover = false;
+        return false;
+      }
+      const checkbox = audioTensionDebugMenuState.checkboxBounds;
+      const hovering = !!checkbox && pointer.x >= checkbox.x && pointer.x <= checkbox.x + checkbox.w && pointer.y >= checkbox.y && pointer.y <= checkbox.y + checkbox.h;
+      audioTensionDebugMenuState.checkboxHover = hovering;
+      return hovering;
+    }
+
     function handleAudioTensionDebugMenuPointerDown(pointer) {
       if (!audioTensionDebugMenuState.isOpen || !testCheats.testMode) {
         return false;
       }
+
+      if (updateAudioTensionDebugMenuHover(pointer)) {
+        audioTensionDebugMenuState.showOnlyPositiveImpulses = !audioTensionDebugMenuState.showOnlyPositiveImpulses;
+        resetMenuScroll(audioTensionDebugMenuState);
+        audioDirector.onMenuOpen('tension-filter');
+        return true;
+      }
+
       const bounds = audioTensionDebugMenuState.panelBounds;
       if (!bounds) {
         return false;
@@ -17464,12 +17693,14 @@ class AsteroidsAudioDirector {
 
       const info = audioDirector.getAmbientTensionDebugInfo?.() ?? { current: 0, target: 0, equilibriumSources: [], impulseLog: [] };
       const equilibriumSources = info.equilibriumSources ?? [];
-      const impulseLog = info.impulseLog ?? [];
+      const rawImpulseLog = info.impulseLog ?? [];
+      const showOnlyPositive = !!audioTensionDebugMenuState.showOnlyPositiveImpulses;
+      const impulseLog = showOnlyPositive ? rawImpulseLog.filter((entry) => (entry.amount ?? 0) > 0.0001) : rawImpulseLog;
       const panelWidth = Math.min(720, Math.max(520, canvas.width * 0.46));
       const panelHeight = Math.min(canvas.height - 28, Math.max(420, canvas.height - 28));
       const panelX = canvas.width - panelWidth - 14;
       const panelY = 14;
-      const headerHeight = 98;
+      const headerHeight = 122;
       const footerHeight = 28;
       const contentX = panelX + 14;
       const contentY = panelY + headerHeight;
@@ -17487,9 +17718,9 @@ class AsteroidsAudioDirector {
           rows.push({ kind: "source", ...equilibriumSources[i] });
         }
       }
-      rows.push({ kind: "section", label: "ULTIMOS 100 IMPULSOS" });
+      rows.push({ kind: "section", label: showOnlyPositive ? "ULTIMOS IMPULSOS > 0%" : "ULTIMOS 100 IMPULSOS" });
       if (impulseLog.length === 0) {
-        rows.push({ kind: "empty", label: "Sin impulsos recientes", detail: "disparos, casi impactos y muertes apareceran aqui" });
+        rows.push({ kind: "empty", label: showOnlyPositive ? "Sin impulsos mayores que 0%" : "Sin impulsos recientes", detail: "disparos, casi impactos y muertes apareceran aqui" });
       } else {
         for (let i = 0; i < impulseLog.length; i++) {
           rows.push({ kind: "impulse", ...impulseLog[i] });
@@ -17517,7 +17748,7 @@ class AsteroidsAudioDirector {
       ctx.fillText('TENSION DEBUG', panelX + 16, panelY + 14);
       ctx.font = '13px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.72)';
-      ctx.fillText('A cierra · fuentes de equilibrio + historial de impulsos recientes', panelX + 16, panelY + 44);
+      ctx.fillText('A cierra · fuentes de equilibrio + historial de impulsos recientes · click filtra > 0%', panelX + 16, panelY + 44);
       ctx.fillStyle = 'rgba(255,210,120,0.95)';
       ctx.fillText(`actual ${Math.round((info.current ?? 0) * 100)}% · equilibrio ${Math.round((info.target ?? 0) * 100)}% · impulso +${Math.round((info.impulse ?? 0) * 100)}%`, panelX + 16, panelY + 66);
 
@@ -17530,6 +17761,22 @@ class AsteroidsAudioDirector {
       ctx.fillRect(barX, barY, barW * clamp(info.current ?? 0, 0, 1), 6);
       ctx.fillStyle = 'rgba(125,220,255,0.85)';
       ctx.fillRect(barX + barW * clamp(info.target ?? 0, 0, 1) - 1, barY - 3, 2, 12);
+
+      const checkboxX = panelX + 16;
+      const checkboxY = panelY + 102;
+      const checkboxSize = 13;
+      audioTensionDebugMenuState.checkboxBounds = { x: checkboxX - 4, y: checkboxY - 4, w: 250, h: 22 };
+      ctx.fillStyle = audioTensionDebugMenuState.checkboxHover ? 'rgba(255,190,115,0.18)' : 'rgba(255,255,255,0.06)';
+      ctx.fillRect(checkboxX - 4, checkboxY - 4, 250, 22);
+      ctx.strokeStyle = showOnlyPositive ? 'rgba(255,190,115,0.95)' : 'rgba(255,255,255,0.45)';
+      ctx.strokeRect(checkboxX, checkboxY, checkboxSize, checkboxSize);
+      if (showOnlyPositive) {
+        ctx.fillStyle = 'rgba(255,190,115,0.95)';
+        ctx.fillRect(checkboxX + 3, checkboxY + 3, checkboxSize - 6, checkboxSize - 6);
+      }
+      ctx.font = '12px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.fillText('solo eventos que sumaron > 0%', checkboxX + 22, checkboxY - 1);
 
       ctx.save();
       ctx.beginPath();
@@ -17858,6 +18105,7 @@ class AsteroidsAudioDirector {
       drawAudioChordOverlay();
       drawAudioDebugMenu();
       drawAudioTensionDebugMenu();
+      drawCheatMenu();
       drawDiagnosticsOverlay();
       drawFactionOverlay();
       drawShopOverlay();
