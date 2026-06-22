@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Asteroids 0.7.15</title>
+  <title>Asteroids 0.7.14</title>
   <style>
     html, body {
       margin: 0;
@@ -219,10 +219,7 @@
             if (typeof cheatMenuState !== "undefined") {
               cheatMenuState.isOpen = false;
               cheatMenuState.hoverIndex = -1;
-              cheatMenuState.sliderHoverIndex = -1;
-              cheatMenuState.draggingSliderKey = null;
               cheatMenuState.buttons = [];
-              cheatMenuState.sliders = [];
             }
             this.infiniteAmmo = false;
             this.infiniteFuel = false;
@@ -2551,8 +2548,6 @@ class AsteroidsAudioDirector {
     this.ambientThreatSummary = [];
     this.ambientEquilibriumSources = [];
     this.ambientTensionImpulseLog = [];
-    this.forcedAmbientTensionEnabled = false;
-    this.forcedAmbientTensionValue = 0;
     this.queue = [];
     this.activeVoiceUntil = [];
     this.entityCooldowns = new Map();
@@ -2904,38 +2899,8 @@ class AsteroidsAudioDirector {
     }
   }
 
-  setForcedAmbientTensionEnabled(enabled) {
-    this.forcedAmbientTensionEnabled = !!enabled;
-    if (this.forcedAmbientTensionEnabled) {
-      this.ambientSustainedTension = clamp(this.forcedAmbientTensionValue ?? 0, 0, 1);
-      this.ambientImpulseTension = 0;
-      this.ambientTension = this.getEffectiveAmbientTension();
-    }
-    return this.forcedAmbientTensionEnabled;
-  }
-
-  setForcedAmbientTensionValue(value) {
-    this.forcedAmbientTensionValue = clamp(Number.isFinite(value) ? value : 0, 0, 1);
-    if (this.forcedAmbientTensionEnabled) {
-      this.ambientSustainedTension = this.forcedAmbientTensionValue;
-      this.ambientImpulseTension = 0;
-      this.ambientTension = this.getEffectiveAmbientTension();
-    }
-    return this.forcedAmbientTensionValue;
-  }
-
-  toggleForcedAmbientTension() {
-    return this.setForcedAmbientTensionEnabled(!this.forcedAmbientTensionEnabled);
-  }
-
   updateAmbientTension(dt, biomeState = null, simulationActive = true) {
     const target = this.computeAmbientTensionTarget(biomeState);
-    if (this.forcedAmbientTensionEnabled) {
-      this.ambientSustainedTension = clamp(this.forcedAmbientTensionValue ?? 0, 0, 1);
-      this.ambientImpulseTension = 0;
-      this.ambientTension = this.getEffectiveAmbientTension();
-      return this.ambientTension;
-    }
     if (simulationActive && dt > 0) {
       const rate = target > this.ambientSustainedTension ? AUDIO_TENSION_RISE_RATE : AUDIO_TENSION_FALL_RATE;
       this.ambientSustainedTension = moveTowardValue(this.ambientSustainedTension, target, rate * dt);
@@ -2946,9 +2911,6 @@ class AsteroidsAudioDirector {
   }
 
   getEffectiveAmbientTension() {
-    if (this.forcedAmbientTensionEnabled) {
-      return clamp(this.forcedAmbientTensionValue ?? 0, 0, 1);
-    }
     return clamp((this.ambientSustainedTension ?? 0) + (this.ambientImpulseTension ?? 0), 0, 1);
   }
 
@@ -2961,8 +2923,6 @@ class AsteroidsAudioDirector {
       conditions: this.ambientConditionTension ?? 0,
       threat: this.ambientThreatTension ?? 0,
       impulse: this.ambientImpulseTension ?? 0,
-      forced: !!this.forcedAmbientTensionEnabled,
-      forcedValue: this.forcedAmbientTensionValue ?? 0,
       threats: this.ambientThreatSummary ?? [],
       equilibriumSources: this.ambientEquilibriumSources ?? [],
       impulseLog: this.ambientTensionImpulseLog ?? []
@@ -12040,7 +12000,7 @@ class AsteroidsAudioDirector {
         this.world = world;
         this.player = player;
 
-        this.spawnVersion = "0.7.15";
+        this.spawnVersion = "0.7.14";
         this.spawnRadius = 7600;
         this.despawnRadius = 9000;
         this.baseBodyBudget = 160;
@@ -14596,10 +14556,7 @@ class AsteroidsAudioDirector {
     const cheatMenuState = {
       isOpen: false,
       buttons: [],
-      sliders: [],
       hoverIndex: -1,
-      sliderHoverIndex: -1,
-      draggingSliderKey: null,
       panelBounds: null
     };
 
@@ -15245,10 +15202,7 @@ class AsteroidsAudioDirector {
         }
         cheatMenuState.isOpen = !cheatMenuState.isOpen;
         cheatMenuState.hoverIndex = -1;
-        cheatMenuState.sliderHoverIndex = -1;
-        cheatMenuState.draggingSliderKey = null;
         cheatMenuState.buttons = [];
-        cheatMenuState.sliders = [];
         if (cheatMenuState.isOpen) {
           audioDirector.onMenuOpen("cheats");
         } else {
@@ -15300,10 +15254,7 @@ class AsteroidsAudioDirector {
       if (cheatMenuState.isOpen && testCheats.testMode && e.key === "Escape") {
         cheatMenuState.isOpen = false;
         cheatMenuState.hoverIndex = -1;
-        cheatMenuState.sliderHoverIndex = -1;
-        cheatMenuState.draggingSliderKey = null;
         cheatMenuState.buttons = [];
-        cheatMenuState.sliders = [];
         audioDirector.onMenuClose("cheats");
         e.preventDefault();
         return;
@@ -15494,7 +15445,7 @@ class AsteroidsAudioDirector {
       const audioDebugHover = updateAudioDebugMenuHover(pointer);
       const audioTensionHover = updateAudioTensionDebugMenuHover(pointer);
       if (!shopState.isOpen) {
-        const pointerHover = cheatHover >= 0 || cheatHover === -2 || !!cheatMenuState.draggingSliderKey || audioDebugHover >= 0 || audioTensionHover;
+        const pointerHover = cheatHover >= 0 || audioDebugHover >= 0 || audioTensionHover;
         const menuOpen = factionMenuState.isOpen || diagnosticsMenuState.isOpen || audioDebugMenuState.isOpen || audioTensionDebugMenuState.isOpen || cheatMenuState.isOpen;
         canvas.style.cursor = pointerHover ? "pointer" : (menuOpen ? "default" : "crosshair");
         return;
@@ -15524,8 +15475,6 @@ class AsteroidsAudioDirector {
       audioDebugMenuState.hoverIndex = -1;
       audioTensionDebugMenuState.checkboxHover = false;
       cheatMenuState.hoverIndex = -1;
-      cheatMenuState.sliderHoverIndex = -1;
-      cheatMenuState.draggingSliderKey = null;
       mouse.left = false;
       mouse.right = false;
       mouse.brakeLockTarget = null;
@@ -15599,7 +15548,6 @@ class AsteroidsAudioDirector {
     window.addEventListener("mouseup", (event) => {
       if (event.button === 0) {
         mouse.left = false;
-        cheatMenuState.draggingSliderKey = null;
       } else if (event.button === 2) {
         mouse.right = false;
       }
@@ -16810,7 +16758,7 @@ class AsteroidsAudioDirector {
 
       if (testCheats.testMode) {
         ctx.fillStyle = "#7ddcff";
-        ctx.fillText(`modo pruebas: ON | C trampas | invulnerable ${testCheats.invincibility ? 'SI' : 'NO'} | municion ${testCheats.infiniteAmmo ? '∞' : 'normal'} | combustible ${testCheats.infiniteFuel ? '∞' : 'normal'} | tension ${audioDirector?.forcedAmbientTensionEnabled ? Math.round((audioDirector.forcedAmbientTensionValue ?? 0) * 100) + '% fija' : 'auto'} | spawns ${proceduralField.spawnsEnabled ? 'ON' : 'OFF'}`, 20, 160);
+        ctx.fillText(`modo pruebas: ON | C trampas | invulnerable ${testCheats.invincibility ? 'SI' : 'NO'} | municion ${testCheats.infiniteAmmo ? '∞' : 'normal'} | combustible ${testCheats.infiniteFuel ? '∞' : 'normal'} | spawns ${proceduralField.spawnsEnabled ? 'ON' : 'OFF'}`, 20, 160);
       }
 
       const drawContextLine = (message, color = "white") => {
@@ -17173,7 +17121,7 @@ class AsteroidsAudioDirector {
       ctx.textBaseline = 'top';
       ctx.font = 'bold 13px monospace';
       ctx.fillStyle = 'rgba(235,250,255,0.96)';
-      ctx.fillText(`TENSION ${Math.round(tension * 100)}%${info.forced ? ' FORZADA' : ''}`, panelX + 12, panelY + 8);
+      ctx.fillText(`TENSION ${Math.round(tension * 100)}%`, panelX + 12, panelY + 8);
       ctx.font = '11px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.68)';
       ctx.fillText(`eq ${Math.round(target * 100)} · base ${Math.round(base * 100)} · amenaza ${Math.round(conditions * 100)} · impulso +${Math.round(impulse * 100)}`, panelX + 116, panelY + 9);
@@ -17398,20 +17346,6 @@ class AsteroidsAudioDirector {
           detail: testCheats.invincibility ? 'la vida se mantiene al maximo' : 'la nave recibe dano normalmente'
         },
         {
-          key: 'forceAmbientTension',
-          kind: 'toggle',
-          label: 'Forzar tension',
-          enabled: !!audioDirector?.forcedAmbientTensionEnabled,
-          detail: audioDirector?.forcedAmbientTensionEnabled ? 'usa el valor manual del slider' : 'la tension se calcula automaticamente'
-        },
-        {
-          key: 'forcedAmbientTensionValue',
-          kind: 'slider',
-          label: 'Tension forzada',
-          value: clamp(audioDirector?.forcedAmbientTensionValue ?? audioDirector?.ambientTension ?? 0, 0, 1),
-          detail: 'arrastra o haz click para fijar entre 0% y 100%'
-        },
-        {
           key: 'grantCredits',
           kind: 'button',
           label: '+10000 creditos',
@@ -17425,12 +17359,7 @@ class AsteroidsAudioDirector {
     function updateCheatMenuHover(pointer) {
       if (!cheatMenuState.isOpen || !testCheats.testMode) {
         cheatMenuState.hoverIndex = -1;
-        cheatMenuState.sliderHoverIndex = -1;
         return -1;
-      }
-
-      if (cheatMenuState.draggingSliderKey) {
-        updateCheatMenuSliderValue(cheatMenuState.draggingSliderKey, pointer);
       }
 
       let hoverIndex = -1;
@@ -17447,38 +17376,8 @@ class AsteroidsAudioDirector {
           break;
         }
       }
-
-      let sliderHoverIndex = -1;
-      const sliders = cheatMenuState.sliders ?? [];
-      for (let i = 0; i < sliders.length; i++) {
-        const slider = sliders[i];
-        if (
-          pointer.x >= slider.x &&
-          pointer.x <= slider.x + slider.w &&
-          pointer.y >= slider.y &&
-          pointer.y <= slider.y + slider.h
-        ) {
-          sliderHoverIndex = i;
-          break;
-        }
-      }
-
       cheatMenuState.hoverIndex = hoverIndex;
-      cheatMenuState.sliderHoverIndex = sliderHoverIndex;
-      return hoverIndex >= 0 ? hoverIndex : (sliderHoverIndex >= 0 ? -2 : -1);
-    }
-
-    function updateCheatMenuSliderValue(key, pointer) {
-      const sliders = cheatMenuState.sliders ?? [];
-      const slider = sliders.find((entry) => entry.key === key);
-      if (!slider) return false;
-      const value = clamp((pointer.x - slider.trackX) / Math.max(1, slider.trackW), 0, 1);
-      if (key === 'forcedAmbientTensionValue') {
-        audioDirector.setForcedAmbientTensionValue(value);
-        audioDirector.setForcedAmbientTensionEnabled(true);
-        return true;
-      }
-      return false;
+      return hoverIndex;
     }
 
     // Gestiona clicks del menu de trampas sin dispersar atajos por el juego.
@@ -17487,25 +17386,12 @@ class AsteroidsAudioDirector {
         return false;
       }
 
-      updateCheatMenuHover(pointer);
-      const sliderHoverIndex = cheatMenuState.sliderHoverIndex ?? -1;
-      if (sliderHoverIndex >= 0) {
-        const slider = cheatMenuState.sliders[sliderHoverIndex];
-        cheatMenuState.draggingSliderKey = slider.key;
-        updateCheatMenuSliderValue(slider.key, pointer);
-        audioDirector.onMenuOpen('cheat-slider');
-        return true;
-      }
-
-      const hoverIndex = cheatMenuState.hoverIndex ?? -1;
+      const hoverIndex = updateCheatMenuHover(pointer);
       if (hoverIndex >= 0) {
         const button = cheatMenuState.buttons[hoverIndex];
         if (button.key === 'grantCredits') {
           testCheats.grantCredits(10000);
           audioDirector.onPurchase({ cost: 0 });
-        } else if (button.key === 'forceAmbientTension') {
-          audioDirector.toggleForcedAmbientTension();
-          audioDirector.onMenuOpen('cheat-toggle');
         } else {
           testCheats.toggleCheat(button.key);
           audioDirector.onMenuOpen('cheat-toggle');
@@ -17525,18 +17411,16 @@ class AsteroidsAudioDirector {
       if (!cheatMenuState.isOpen || !testCheats.testMode) return;
 
       const rows = buildCheatMenuRows();
-      const panelWidth = Math.min(470, Math.max(390, canvas.width * 0.32));
-      const panelHeight = 396;
+      const panelWidth = Math.min(430, Math.max(360, canvas.width * 0.3));
+      const panelHeight = 292;
       const panelX = Math.round((canvas.width - panelWidth) * 0.5);
-      const panelY = Math.max(18, Math.round(canvas.height * 0.12));
+      const panelY = Math.max(18, Math.round(canvas.height * 0.16));
       const contentX = panelX + 18;
       let y = panelY + 78;
       const rowHeight = 44;
-      const sliderRowHeight = 68;
 
       cheatMenuState.panelBounds = { x: panelX, y: panelY, w: panelWidth, h: panelHeight };
       cheatMenuState.buttons = [];
-      cheatMenuState.sliders = [];
 
       ctx.save();
       ctx.fillStyle = 'rgba(6, 10, 18, 0.93)';
@@ -17552,72 +17436,20 @@ class AsteroidsAudioDirector {
       ctx.fillText('TRAMPAS', panelX + 18, panelY + 14);
       ctx.font = '13px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillText('C cierra · click alterna · arrastra slider', panelX + 18, panelY + 44);
+      ctx.fillText('C cierra · click alterna opciones', panelX + 18, panelY + 44);
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const currentRowHeight = row.kind === 'slider' ? sliderRowHeight : rowHeight;
         const button = {
           key: row.key,
           x: contentX,
           y,
           w: panelWidth - 36,
-          h: currentRowHeight - 8
+          h: rowHeight - 8
         };
-        const hoveredButtonIndex = cheatMenuState.hoverIndex;
-        const hoveredSliderIndex = cheatMenuState.sliderHoverIndex;
-
-        if (row.kind === 'slider') {
-          const value = clamp(row.value ?? 0, 0, 1);
-          const sliderIndex = cheatMenuState.sliders.length;
-          const trackX = button.x + 12;
-          const trackY = button.y + 38;
-          const trackW = button.w - 24;
-          const trackH = 10;
-          cheatMenuState.sliders.push({
-            key: row.key,
-            x: button.x,
-            y: button.y,
-            w: button.w,
-            h: button.h,
-            trackX,
-            trackY,
-            trackW,
-            trackH
-          });
-          const hovered = hoveredSliderIndex === sliderIndex || cheatMenuState.draggingSliderKey === row.key;
-
-          ctx.fillStyle = hovered ? 'rgba(125,220,255,0.16)' : 'rgba(255,255,255,0.05)';
-          ctx.fillRect(button.x, button.y, button.w, button.h);
-          ctx.strokeStyle = hovered ? 'rgba(125,220,255,0.62)' : 'rgba(255,255,255,0.14)';
-          ctx.strokeRect(button.x, button.y, button.w, button.h);
-
-          ctx.font = 'bold 14px monospace';
-          ctx.fillStyle = audioDirector?.forcedAmbientTensionEnabled ? 'rgba(125,255,170,0.95)' : 'rgba(255,255,255,0.92)';
-          ctx.fillText(`${row.label}: ${Math.round(value * 100)}%`, button.x + 12, button.y + 8);
-          ctx.font = '12px monospace';
-          ctx.fillStyle = 'rgba(255,255,255,0.62)';
-          ctx.fillText(row.detail, button.x + 12, button.y + 23);
-
-          ctx.fillStyle = 'rgba(255,255,255,0.12)';
-          ctx.fillRect(trackX, trackY, trackW, trackH);
-          ctx.fillStyle = 'rgba(125,220,255,0.55)';
-          ctx.fillRect(trackX, trackY, trackW * value, trackH);
-          ctx.strokeStyle = 'rgba(255,255,255,0.24)';
-          ctx.strokeRect(trackX, trackY, trackW, trackH);
-          const knobX = trackX + trackW * value;
-          ctx.fillStyle = hovered ? 'rgba(255,255,255,0.95)' : 'rgba(125,220,255,0.92)';
-          ctx.beginPath();
-          ctx.arc(knobX, trackY + trackH * 0.5, 7, 0, Math.PI * 2);
-          ctx.fill();
-
-          y += currentRowHeight;
-          continue;
-        }
-
         const buttonIndex = cheatMenuState.buttons.length;
         cheatMenuState.buttons.push(button);
-        const hovered = hoveredButtonIndex === buttonIndex;
+        const hovered = cheatMenuState.hoverIndex === buttonIndex;
         const isToggle = row.kind === 'toggle';
         const enabled = !!row.enabled;
 
@@ -17640,7 +17472,7 @@ class AsteroidsAudioDirector {
         ctx.font = '12px monospace';
         ctx.fillStyle = 'rgba(255,255,255,0.62)';
         ctx.fillText(row.detail, button.x + 12, button.y + 25);
-        y += currentRowHeight;
+        y += rowHeight;
       }
 
       ctx.restore();
